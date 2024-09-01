@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/Eyepan/yap/src/cacher"
@@ -13,6 +14,11 @@ import (
 // Main execution
 func main() {
 	cache := cacher.FSCache{CacheDir: "cache"}
+
+	npmrc, err := config.LoadConfigurations()
+	if err != nil {
+		log.Fatalln("Error parsing config", err)
+	}
 
 	packageJSON, err := config.ParsePackageJSON()
 	if err != nil {
@@ -39,7 +45,7 @@ func main() {
 		wg.Add(1)
 		go func(d types.Dependency) {
 			defer wg.Done()
-			subdeps, err := dependencies.GetAllSubdependencies(d, &cache)
+			subdeps, err := dependencies.GetAllSubdependencies(d, &cache, npmrc)
 			if err != nil {
 				fmt.Println("Error fetching subdependencies:", err)
 				return

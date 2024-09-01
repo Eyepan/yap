@@ -10,7 +10,7 @@ import (
 
 var metadataCache sync.Map
 
-func GetAllSubdependencies(pkg types.Dependency, cache *cacher.FSCache) ([]types.Dependency, error) {
+func GetAllSubdependencies(pkg types.Dependency, cache *cacher.FSCache, npmrc types.Config) ([]types.Dependency, error) {
 	stack := []types.Dependency{pkg}
 	uniqueDeps := map[string]types.Dependency{}
 
@@ -25,7 +25,7 @@ func GetAllSubdependencies(pkg types.Dependency, cache *cacher.FSCache) ([]types
 			if val, ok := metadataCache.Load(currentPkg.Name); ok {
 				deps = val.([]types.Dependency)
 			} else {
-				md, err := metadata.FetchPackageMetadata(currentPkg, cache)
+				md, err := metadata.FetchPackageMetadata(currentPkg, cache, npmrc)
 				if err != nil {
 					return nil, err
 				}

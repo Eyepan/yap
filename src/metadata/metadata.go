@@ -12,12 +12,7 @@ import (
 )
 
 // Fetch metadata of a package
-func FetchPackageMetadata(pkg types.Dependency, cache *cacher.FSCache) (types.VersionMetadata, error) {
-	npmrc, err := config.LoadConfigurations()
-	if err != nil {
-		return types.VersionMetadata{}, fmt.Errorf("error loading configurations: \n%w", err)
-	}
-
+func FetchPackageMetadata(pkg types.Dependency, cache *cacher.FSCache, npmrc types.Config) (types.VersionMetadata, error) {
 	registryURL := npmrc["registry"]
 	packageURL := fmt.Sprintf("%s/%s", registryURL, pkg.Name)
 	data, err := cache.Fetch(packageURL, pkg.Name, config.ExtractAuthToken(npmrc))
