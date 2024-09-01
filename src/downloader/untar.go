@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,9 +26,9 @@ func untar(r io.Reader, dir string) (err error) {
 	defer func() {
 		td := time.Since(t0)
 		if err == nil {
-			log.Printf("extracted tarball into %s: %d files, %d dirs (%v)", dir, nFiles, len(madeDir), td)
+			slog.Info(fmt.Sprintf("extracted tarball into %s: %d files, %d dirs (%v)", dir, nFiles, len(madeDir), td))
 		} else {
-			log.Printf("error extracting tarball into %s after %d files, %d dirs, %v: %v", dir, nFiles, len(madeDir), td, err)
+			slog.Error(fmt.Sprintf("error extracting tarball into %s after %d files, %d dirs, %v: %v", dir, nFiles, len(madeDir), td, err))
 		}
 	}()
 	zr, err := gzip.NewReader(r)
@@ -43,7 +43,7 @@ func untar(r io.Reader, dir string) (err error) {
 			break
 		}
 		if err != nil {
-			log.Printf("tar reading error: %v", err)
+			slog.Error(fmt.Sprintf("tar reading error: %v", err))
 			return fmt.Errorf("tar error: %v", err)
 		}
 		if !validRelPath(f.Name) {
@@ -107,7 +107,7 @@ func untar(r io.Reader, dir string) (err error) {
 					// on it anywhere (the gomote push command relies
 					// on digests only), so this is a little pointless
 					// for now.
-					log.Printf("error changing modtime: %v (further Chtimes errors suppressed)", err)
+					slog.Error(fmt.Sprintf("error changing modtime: %v (further Chtimes errors suppressed)", err))
 					loggedChtimesError = true // once is enough
 				}
 			}

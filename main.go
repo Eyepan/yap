@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path"
 	"runtime"
@@ -35,7 +37,7 @@ func main() {
 	case "install":
 		handleInstall()
 	default:
-		log.Printf("Unknown command: %s\n", command)
+		slog.Error(fmt.Sprintf("Unknown command: %s\n", command))
 	}
 }
 
@@ -74,11 +76,11 @@ func installListOfPackages(packages []types.Package, cache *fetcher.FSCache, npm
 		if !force {
 			isDownloaded, err := downloader.CheckIfPackageIsAlreadyDownloaded(dep.Name)
 			if err != nil {
-				log.Printf("Error checking if package %s is already downloaded: %v", dep.Name, err)
+				slog.Info(fmt.Sprintf("Error checking if package %s is already downloaded: %v", dep.Name, err))
 				continue
 			}
 			if isDownloaded {
-				log.Printf("Package %s is already downloaded. Skipping installation.", dep.Name)
+				slog.Info(fmt.Sprintf("Package %s is already downloaded. Skipping installation.", dep.Name))
 				continue
 			}
 		}
@@ -97,7 +99,7 @@ func startMetadataWorkers(metadataTaskQueue chan MetadataTask, downloadTaskQueue
 			for task := range metadataTaskQueue {
 				md, err := metadata.FetchPackageMetadata(task.Package, cache, npmrc)
 				if err != nil {
-					log.Printf("Error fetching metadata for package %s: %v\n", task.Package.Name, err)
+					slog.Info(fmt.Sprintf("Error fetching metadata for package %s: %v\n", task.Package.Name, err))
 					wg.Done()
 					continue
 				}
@@ -128,7 +130,7 @@ func startDownloadWorkers(downloadTaskQueue <-chan DownloadTask, wg *sync.WaitGr
 				}
 				storeLocation := path.Join(homeDir, ".yap_store")
 				if err := downloader.DownloadTarballAndExtract(tarballURL, md.Metadata.Name, storeLocation); err != nil {
-					log.Printf("Error downloading tarball for package %s: %v\n", md.Metadata.Name, err)
+					slog.Info(fmt.Sprintf("Error downloading tarball for package %s: %v\n", md.Metadata.Name, err))
 					wg.Done()
 					return
 				}

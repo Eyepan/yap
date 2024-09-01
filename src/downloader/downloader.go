@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -109,7 +110,7 @@ func extractTarball(tarballData *bytes.Buffer, packageName, storeLocation string
 				}
 				file.Close()
 			default:
-				fmt.Printf("Skipping unsupported tarball entry type %c: %s\n", header.Typeflag, header.Name)
+				slog.Warn(fmt.Sprintf("Skipping unsupported tarball entry type %c: %s\n", header.Typeflag, header.Name))
 			}
 		}
 	}
