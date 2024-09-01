@@ -2,56 +2,66 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"os"
+	"sync"
 
-	"github.com/Eyepan/yap/config"
-	"github.com/Eyepan/yap/dependencies"
-	"github.com/Eyepan/yap/fetcher"
-	"github.com/Eyepan/yap/resolver"
+	"github.com/Eyepan/yap/src/cacher"
+	"github.com/Eyepan/yap/src/config"
+	"github.com/Eyepan/yap/src/dependencies"
+	"github.com/Eyepan/yap/src/types"
 )
 
+// Main execution
 func main() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	packages, err := dependencies.ParsePackages()
-	fetchCache := fetcher.NewCache()
+	cache := cacher.FSCache{CacheDir: "cache"}
 
+	packageJSON, err := config.ParsePackageJSON()
 	if err != nil {
-		log.Fatalln("parsing packages failed\n", err)
-	}
-	npmrc, err := config.LoadConfigurations()
-	if err != nil {
-		log.Fatalln("loading configurations failed\n", err)
-	}
-	// fmt.Println(packages, npmrc, authToken)
-
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: install <package-name>@<version> or install to install dependencies from package.json")
-		os.Exit(1)
+		fmt.Println("Error parsing package.json:", err)
+		return
 	}
 
-	command := os.Args[1]
-
-	switch command {
-	case "install":
-		fmt.Println("not implemented yet")
-	case "list":
-		fmt.Println("Packages to be installed", packages)
-	case "test":
-		metadata, err := resolver.FetchPackageMetadata("express", "latest", npmrc, fetchCache)
-		if err != nil {
-			log.Fatalln("fetching package metadata failed\n", err)
-		}
-		subdependencies, err := resolver.GetSubdependencies(metadata)
-		if err != nil {
-			log.Fatalf("getting subdependencies for package %s failed \n%s", metadata.Name, err)
-		}
-		allSubdependencies, err := resolver.GetAllSubdependencies(subdependencies, npmrc, fetchCache)
-		if err != nil {
-			log.Fatalf("getting all subdependencies for package %s failed \n%s", subdependencies, err)
-		}
-		fmt.Println("All subdependencies:", allSubdependencies)
-	default:
-		fmt.Println("Unknown command")
+	allDependencies := []types.Dependency{}
+	for key, value := range packageJSON.Dependencies {
+		allDependencies = append(allDependencies, types.Dependency{Name: key, Version: value})
 	}
+	for key, value := range packageJSON.DevDependencies {
+		allDependencies = append(allDependencies, types.Dependency{Name: key, Version: value})
+	}
+	for key, value := range packageJSON.PeerDependencies {
+		allDependencies = append(allDependencies, types.Dependency{Name: key, Version: value})
+	}
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var totalSubdependencies []types.Dependency
+
+	for _, dep := range allDependencies {
+		wg.Add(1)
+		go func(d types.Dependency) {
+			defer wg.Done()
+			subdeps, err := dependencies.GetAllSubdependencies(d, &cache)
+			if err != nil {
+				fmt.Println("Error fetching subdependencies:", err)
+				return
+			}
+			mu.Lock()
+			totalSubdependencies = append(totalSubdependencies, subdeps...)
+			mu.Unlock()
+		}(dep)
+	}
+
+	wg.Wait()
+
+	// Remove duplicates
+	uniqueSubdeps := map[string]types.Dependency{}
+	for _, dep := range totalSubdependencies {
+		uniqueSubdeps[dep.Name] = dep
+	}
+
+	var finalSubdependencies []types.Dependency
+	for _, dep := range uniqueSubdeps {
+		finalSubdependencies = append(finalSubdependencies, dep)
+	}
+
+	fmt.Println("Total subdependencies:", len(finalSubdependencies))
 }
