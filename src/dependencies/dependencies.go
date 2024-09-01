@@ -3,16 +3,17 @@ package dependencies
 import (
 	"sync"
 
-	"github.com/Eyepan/yap/src/cacher"
+	"github.com/Eyepan/yap/src/fetcher"
 	"github.com/Eyepan/yap/src/metadata"
 	"github.com/Eyepan/yap/src/types"
 )
 
 var metadataCache sync.Map
 
-func GetAllSubdependencies(pkg types.Dependency, cache *cacher.FSCache, npmrc types.Config) ([]types.Dependency, error) {
+// GetAllSubdependencies retrieves all subdependencies for a given package.
+func GetAllSubdependencies(pkg types.Dependency, cache *fetcher.FSCache, npmrc types.Config) ([]types.Dependency, error) {
 	stack := []types.Dependency{pkg}
-	uniqueDeps := map[string]types.Dependency{}
+	uniqueDeps := make(map[string]types.Dependency)
 
 	for len(stack) > 0 {
 		currentPkg := stack[len(stack)-1]

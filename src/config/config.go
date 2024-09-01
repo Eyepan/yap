@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/Eyepan/yap/src/types"
 )
 
+// ParsePackageJSON reads and parses package.json.
 func ParsePackageJSON() (types.PackageJSON, error) {
 	filePath := filepath.Join(".", "package.json")
 	data, err := os.ReadFile(filePath)
@@ -26,10 +26,10 @@ func ParsePackageJSON() (types.PackageJSON, error) {
 	return pkgJSON, nil
 }
 
-// Utility function to read configuration files
-func readConfigFile(path string) (types.Config, error) {
+// readConfigFile reads and parses configuration files.
+func readConfigFile(filePath string) (types.Config, error) {
 	config := make(types.Config)
-	file, err := os.Open(path)
+	file, err := os.Open(filePath)
 	if err != nil {
 		return config, err
 	}
@@ -40,47 +40,42 @@ func readConfigFile(path string) (types.Config, error) {
 		return config, err
 	}
 
-	lines := string(content)
-	for _, line := range strings.Split(lines, "\n") {
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" || line[0] == ';' || line[0] == '#' {
+		if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "#") {
 			continue
 		}
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		config[key] = value
+		config[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 	}
 
 	return config, nil
 }
 
-// Load configurations from global and local .npmrc files
+// LoadConfigurations loads configurations from global and local .npmrc files.
 func LoadConfigurations() (types.Config, error) {
 	config := types.Config{"registry": "https://registry.npmjs.org"}
+
 	homeDir, _ := os.UserHomeDir()
-	globalConfigPath := path.Join(homeDir, ".npmrc")
-	localConfigPath := path.Join(".", ".npmrc")
+	globalConfigPath := filepath.Join(homeDir, ".npmrc")
+	localConfigPath := filepath.Join(".", ".npmrc")
 
-	if cfg, err := readConfigFile(globalConfigPath); err == nil {
-		for k, v := range cfg {
-			config[k] = v
-		}
-	}
-
-	if cfg, err := readConfigFile(localConfigPath); err == nil {
-		for k, v := range cfg {
-			config[k] = v
+	for _, path := range []string{globalConfigPath, localConfigPath} {
+		if cfg, err := readConfigFile(path); err == nil {
+			for k, v := range cfg {
+				config[k] = v
+			}
 		}
 	}
 
 	return config, nil
 }
 
-// Extract authentication token from configuration
+// ExtractAuthToken retrieves the authentication token from the configuration.
 func ExtractAuthToken(config types.Config) string {
 	for key, value := range config {
 		if strings.HasSuffix(key, "_authToken") || strings.HasSuffix(key, "_auth") {

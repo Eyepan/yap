@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/Eyepan/yap/src/cacher"
 	"github.com/Eyepan/yap/src/config"
+	"github.com/Eyepan/yap/src/fetcher"
 	"github.com/Eyepan/yap/src/types"
 	"github.com/Masterminds/semver/v3"
 )
 
-// Fetch metadata of a package
-func FetchPackageMetadata(pkg types.Dependency, cache *cacher.FSCache, npmrc types.Config) (types.VersionMetadata, error) {
+// FetchPackageMetadata retrieves metadata for a given package.
+func FetchPackageMetadata(pkg types.Dependency, cache *fetcher.FSCache, npmrc types.Config) (types.VersionMetadata, error) {
 	registryURL := npmrc["registry"]
 	packageURL := fmt.Sprintf("%s/%s", registryURL, pkg.Name)
 	data, err := cache.Fetch(packageURL, pkg.Name, config.ExtractAuthToken(npmrc))
@@ -41,6 +41,7 @@ func FetchPackageMetadata(pkg types.Dependency, cache *cacher.FSCache, npmrc typ
 	return metadata.Versions[exactVersion], nil
 }
 
+// GetSubdependenciesFromMetadata extracts subdependencies from metadata.
 func GetSubdependenciesFromMetadata(metadata types.VersionMetadata) []types.Dependency {
 	var dependencies []types.Dependency
 	for name, version := range metadata.Dependencies {
@@ -49,7 +50,7 @@ func GetSubdependenciesFromMetadata(metadata types.VersionMetadata) []types.Depe
 	return dependencies
 }
 
-// Resolve version based on semver and metadata
+// resolveVersion determines the appropriate version based on the constraint.
 func resolveVersion(pkgName, version string, versions []string) (string, error) {
 	var versionList []*semver.Version
 	for _, v := range versions {
@@ -76,9 +77,9 @@ func resolveVersion(pkgName, version string, versions []string) (string, error) 
 	return "", fmt.Errorf("no matching version found for %s %s", pkgName, version)
 }
 
-// Fetch keys from a map
+// getKeys returns the keys from a map.
 func getKeys(m map[string]types.VersionMetadata) []string {
-	var keys []string
+	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
