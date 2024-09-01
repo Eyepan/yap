@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
+	"path"
 	"runtime"
 	"strings"
 	"sync"
@@ -27,7 +27,7 @@ type MetadataTask struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Expected 'install' command")
+		log.Println("Expected 'install' command")
 		return
 	}
 
@@ -37,7 +37,7 @@ func main() {
 	case "install":
 		handleInstall()
 	default:
-		fmt.Printf("Unknown command: %s\n", command)
+		log.Printf("Unknown command: %s\n", command)
 	}
 }
 
@@ -46,12 +46,12 @@ func handleInstall() {
 
 	npmrc, err := config.LoadConfigurations()
 	if err != nil {
-		log.Fatalln("Error parsing config:", err)
+		log.Fatalf("Error parsing config: %v", err)
 	}
 
 	packageJSON, err := config.ParsePackageJSON()
 	if err != nil {
-		log.Fatalln("Error parsing package.json:", err)
+		log.Fatalf("Error parsing package.json: %v", err)
 	}
 
 	allDependencies := gatherAllDependencies(packageJSON)
@@ -60,7 +60,7 @@ func handleInstall() {
 	if len(args) > 0 {
 		handleInstallArgs(args, &cache, npmrc)
 	} else {
-		installListOfDependencies(allDependencies, &cache, npmrc)
+		installListOfDependencies(allDependencies, &cache, npmrc, false)
 	}
 }
 
@@ -68,7 +68,7 @@ func handleInstallArgs(args []string, cache *fetcher.FSCache, npmrc types.Config
 	if len(args) == 1 && args[0] == "--force" {
 		packageJSON, _ := config.ParsePackageJSON()
 		allDependencies := gatherAllDependencies(packageJSON)
-		installListOfDependencies(allDependencies, cache, npmrc)
+		installListOfDependencies(allDependencies, cache, npmrc, true)
 	} else {
 		for _, arg := range args {
 			if strings.HasPrefix(arg, "--force") {
@@ -80,7 +80,7 @@ func handleInstallArgs(args []string, cache *fetcher.FSCache, npmrc types.Config
 	}
 }
 
-func installListOfDependencies(dependencies []types.Dependency, cache *fetcher.FSCache, npmrc types.Config) {
+func installListOfDependencies(dependencies []types.Dependency, cache *fetcher.FSCache, npmrc types.Config, force bool) {
 	taskQueue := make(chan MetadataTask, len(dependencies))
 	results := make(chan types.VersionMetadata, len(dependencies))
 	var wg sync.WaitGroup
@@ -90,6 +90,19 @@ func installListOfDependencies(dependencies []types.Dependency, cache *fetcher.F
 
 	// Enqueue tasks for metadata fetching
 	for _, dep := range dependencies {
+		// Check if the package is already downloaded
+		if !force {
+			isDownloaded, err := downloader.CheckIfPackageIsAlreadyDownloaded(dep.Name)
+			if err != nil {
+				log.Printf("Error checking if package %s is already downloaded: %v", dep.Name, err)
+				continue
+			}
+			if isDownloaded {
+				log.Printf("Package %s is already downloaded. Skipping installation.", dep.Name)
+				continue
+			}
+		}
+
 		wg.Add(1)
 		taskQueue <- MetadataTask{Package: dep, Result: results}
 	}
@@ -100,13 +113,13 @@ func installListOfDependencies(dependencies []types.Dependency, cache *fetcher.F
 	wg.Wait()
 	close(results) // Close results channel after all workers are done
 
-	fmt.Println("All tasks completed.")
+	log.Println("All tasks completed.")
 }
 
 func installPackage(arg string, cache *fetcher.FSCache, npmrc types.Config, force bool) {
 	parts := strings.Split(arg, "@")
 	if len(parts) != 2 {
-		fmt.Printf("Invalid package format: %s\n", arg)
+		log.Printf("Invalid package format: %s\n", arg)
 		return
 	}
 	dep := types.Dependency{Name: parts[0], Version: parts[1]}
@@ -114,16 +127,16 @@ func installPackage(arg string, cache *fetcher.FSCache, npmrc types.Config, forc
 	if !force {
 		isDownloaded, err := downloader.CheckIfPackageIsAlreadyDownloaded(dep.Name)
 		if err != nil {
-			fmt.Printf("Error checking if package is already downloaded: %v\n", err)
+			log.Printf("Error checking if package is already downloaded: %v", err)
 			return
 		}
 		if isDownloaded {
-			fmt.Printf("Package %s is already downloaded.\n", dep.Name)
+			log.Printf("Package %s is already downloaded.\n", dep.Name)
 			return
 		}
 	}
 
-	installListOfDependencies([]types.Dependency{dep}, cache, npmrc)
+	installListOfDependencies([]types.Dependency{dep}, cache, npmrc, force)
 }
 
 func startMetadataWorkers(taskQueue <-chan MetadataTask, results chan<- types.VersionMetadata, cache *fetcher.FSCache, npmrc types.Config, wg *sync.WaitGroup) {
@@ -144,7 +157,7 @@ func metadataWorker(taskQueue <-chan MetadataTask, results chan<- types.VersionM
 	for task := range taskQueue {
 		metadata, err := metadata.FetchPackageMetadata(task.Package, cache, npmrc)
 		if err != nil {
-			fmt.Printf("Error fetching metadata for package %s: %v\n", task.Package.Name, err)
+			log.Printf("Error fetching metadata for package %s: %v\n", task.Package.Name, err)
 			wg.Done()
 			continue
 		}
@@ -159,8 +172,13 @@ func downloadWorker(results <-chan types.VersionMetadata, wg *sync.WaitGroup) {
 		go func(md types.VersionMetadata) {
 			defer wg.Done()
 			tarballURL := md.Dist.Tarball
-			if err := downloader.DownloadTarballAndExtract(tarballURL, md.Name); err != nil {
-				fmt.Printf("Error downloading or extracting tarball for package %s: %v\n", md.Name, err)
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				log.Println("Error getting home directory location")
+			}
+			storeLocation := path.Join(homeDir, ".yap_store")
+			if err := downloader.DownloadTarballAndExtract(tarballURL, md.Name, storeLocation); err != nil {
+				log.Printf("Error downloading or extracting tarball for package %s: %v\n", md.Name, err)
 			}
 		}(metadata)
 	}

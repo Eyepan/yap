@@ -8,12 +8,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
 
-// DownloadTarballAndExtract downloads a tarball and extracts it to $HOME/.yap_store/<packagename>
-func DownloadTarballAndExtract(tarballURL, packageName string) error {
+// DownloadTarballAndExtract downloads a tarball and extracts it to storeLocation
+func DownloadTarballAndExtract(tarballURL, packageName, storeLocation string) error {
 	// Fetch the tarball
 	resp, err := http.Get(tarballURL)
 	if err != nil {
@@ -32,7 +33,7 @@ func DownloadTarballAndExtract(tarballURL, packageName string) error {
 	}
 
 	// Uncompress and extract the tarball
-	if err := extractTarball(&tarballData, packageName); err != nil {
+	if err := extractTarball(&tarballData, packageName, storeLocation); err != nil {
 		return fmt.Errorf("failed to extract tarball: %w", err)
 	}
 
@@ -40,7 +41,7 @@ func DownloadTarballAndExtract(tarballURL, packageName string) error {
 }
 
 // extractTarball extracts tarball data from a buffer
-func extractTarball(tarballData *bytes.Buffer, packageName string) error {
+func extractTarball(tarballData *bytes.Buffer, packageName, storeLocation string) error {
 	gzipReader, err := gzip.NewReader(tarballData)
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
@@ -48,14 +49,11 @@ func extractTarball(tarballData *bytes.Buffer, packageName string) error {
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
 
 	// Create a directory for the package
-	packageDir := filepath.Join(homeDir, ".yap_store", packageName)
-
+	// homeDir, err := os.UserHomeDir()
+	// packageDir := filepath.Join(homeDir, ".yap_store", packageName)
+	packageDir := path.Join(storeLocation, packageName)
 	if err := os.MkdirAll(packageDir, 0755); err != nil {
 		return fmt.Errorf("failed to create package directory: %w", err)
 	}
