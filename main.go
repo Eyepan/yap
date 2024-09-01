@@ -67,7 +67,7 @@ func installListOfPackages(packages []types.Package, cache *fetcher.FSCache, npm
 	var wg sync.WaitGroup
 
 	startMetadataWorkers(metadataQueue, downloadQueue, cache, npmrc, &wg)
-	startDownloadWorkers(downloadQueue)
+	startDownloadWorkers(downloadQueue, &wg)
 
 	for _, dep := range packages {
 		// Check if the package is already downloaded
@@ -107,13 +107,14 @@ func startMetadataWorkers(metadataTaskQueue chan MetadataTask, downloadTaskQueue
 					wg.Add(1)
 				}
 				downloadQueue <- DownloadTask{Metadata: md}
+				wg.Add(1)
 				wg.Done()
 			}
 		}(metadataTaskQueue, downloadTaskQueue)
 	}
 }
 
-func startDownloadWorkers(downloadTaskQueue <-chan DownloadTask) {
+func startDownloadWorkers(downloadTaskQueue <-chan DownloadTask, wg *sync.WaitGroup) {
 	numWorkers := runtime.NumCPU()
 	for i := 0; i < numWorkers; i++ {
 		go func(downloadTaskQueue <-chan DownloadTask) {
@@ -122,12 +123,16 @@ func startDownloadWorkers(downloadTaskQueue <-chan DownloadTask) {
 				homeDir, err := os.UserHomeDir()
 				if err != nil {
 					log.Println("Error getting home directory")
+					wg.Done()
+					return
 				}
 				storeLocation := path.Join(homeDir, ".yap_store")
 				if err := downloader.DownloadTarballAndExtract(tarballURL, md.Metadata.Name, storeLocation); err != nil {
 					log.Printf("Error downloading tarball for package %s: %v\n", md.Metadata.Name, err)
+					wg.Done()
+					return
 				}
-				// log.Printf("Downloaded %s@%s", md.Metadata.Name, md.Metadata.Version)
+				wg.Done()
 			}
 		}(downloadTaskQueue)
 	}
