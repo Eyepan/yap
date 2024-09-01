@@ -118,3 +118,19 @@ func extractTarball(tarballData *bytes.Buffer, packageName string) error {
 
 	return nil
 }
+
+func CheckIfPackageIsAlreadyDownloaded(packageName string) (bool, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return false, fmt.Errorf("could not get home directory: %v", err)
+	}
+
+	packagePath := filepath.Join(homeDir, ".yap_store", packageName)
+	if _, err := os.Stat(packagePath); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, fmt.Errorf("could not check package path: %v", err)
+	}
+
+	return true, nil
+}

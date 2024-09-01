@@ -2,3 +2,5 @@ package.json
 yap-lock
 store/
 cache/
+node_modules/
+pnpm-lock.yaml
