@@ -11,9 +11,9 @@ import (
 var metadataCache sync.Map
 
 // GetAllSubdependencies retrieves all subdependencies for a given package.
-func GetAllSubdependencies(pkg types.Dependency, cache *fetcher.FSCache, npmrc types.Config) ([]types.Dependency, error) {
-	stack := []types.Dependency{pkg}
-	uniqueDeps := make(map[string]types.Dependency)
+func GetAllSubdependencies(pkg types.Package, cache *fetcher.FSCache, npmrc types.Config) ([]types.Package, error) {
+	stack := []types.Package{pkg}
+	uniqueDeps := make(map[string]types.Package)
 
 	for len(stack) > 0 {
 		currentPkg := stack[len(stack)-1]
@@ -22,9 +22,9 @@ func GetAllSubdependencies(pkg types.Dependency, cache *fetcher.FSCache, npmrc t
 		if _, exists := uniqueDeps[currentPkg.Name]; !exists {
 			uniqueDeps[currentPkg.Name] = currentPkg
 
-			var deps []types.Dependency
+			var deps []types.Package
 			if val, ok := metadataCache.Load(currentPkg.Name); ok {
-				deps = val.([]types.Dependency)
+				deps = val.([]types.Package)
 			} else {
 				md, err := metadata.FetchPackageMetadata(currentPkg, cache, npmrc)
 				if err != nil {
@@ -42,7 +42,7 @@ func GetAllSubdependencies(pkg types.Dependency, cache *fetcher.FSCache, npmrc t
 		}
 	}
 
-	var result []types.Dependency
+	var result []types.Package
 	for _, dep := range uniqueDeps {
 		result = append(result, dep)
 	}

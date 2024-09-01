@@ -12,7 +12,7 @@ import (
 )
 
 // FetchPackageMetadata retrieves metadata for a given package.
-func FetchPackageMetadata(pkg types.Dependency, cache *fetcher.FSCache, npmrc types.Config) (types.VersionMetadata, error) {
+func FetchPackageMetadata(pkg types.Package, cache *fetcher.FSCache, npmrc types.Config) (types.VersionMetadata, error) {
 	registryURL := npmrc["registry"]
 	packageURL := fmt.Sprintf("%s/%s", registryURL, pkg.Name)
 	data, err := cache.Fetch(packageURL, pkg.Name, config.ExtractAuthToken(npmrc))
@@ -42,10 +42,10 @@ func FetchPackageMetadata(pkg types.Dependency, cache *fetcher.FSCache, npmrc ty
 }
 
 // GetSubdependenciesFromMetadata extracts subdependencies from metadata.
-func GetSubdependenciesFromMetadata(metadata types.VersionMetadata) []types.Dependency {
-	var dependencies []types.Dependency
+func GetSubdependenciesFromMetadata(metadata types.VersionMetadata) []types.Package {
+	var dependencies []types.Package
 	for name, version := range metadata.Dependencies {
-		dependencies = append(dependencies, types.Dependency{Name: name, Version: version})
+		dependencies = append(dependencies, types.Package{Name: name, Version: version})
 	}
 	return dependencies
 }

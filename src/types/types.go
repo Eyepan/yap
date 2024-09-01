@@ -1,7 +1,7 @@
 package types
 
-// Dependency represents a package dependency.
-type Dependency struct {
+// Package represents a package dependency.
+type Package struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 }
