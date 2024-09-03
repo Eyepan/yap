@@ -34,20 +34,20 @@ func (pr *ProgressReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func DownloadPackage(pkg types.Package, tarballURL string, npmrc types.Config, force bool) (bool, error) {
+func DownloadPackage(pkg types.Package, tarballURL string, npmrc types.Config, force bool) error {
 	if check, _ := CheckIfPackageIsAlreadyDownloaded(pkg); !force && check {
 		slog.Info(fmt.Sprintf("%s@%s has already been downloaded. Reusing this from the store", pkg.Name, pkg.Version))
-		return true, nil
+		return nil
 	}
 	tarballData, err := DownloadTarball(tarballURL, npmrc)
 	if err != nil {
-		return false, fmt.Errorf("failed while downloading tarball: %w", err)
+		return fmt.Errorf("failed while downloading tarball: %w", err)
 	}
 	err = ExtractTarball(tarballData, fmt.Sprintf("%s@%s", pkg.Name, pkg.Version))
 	if err != nil {
-		return false, fmt.Errorf("failed while extracting tarball: %w", err)
+		return fmt.Errorf("failed while extracting tarball: %w", err)
 	}
-	return true, nil
+	return nil
 }
 
 func DownloadTarball(tarballURL string, npmrc types.Config) (*bytes.Buffer, error) {
