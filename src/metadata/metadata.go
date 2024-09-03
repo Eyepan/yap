@@ -1,87 +1,124 @@
 package metadata
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 
-	"github.com/Eyepan/yap/src/config"
-	"github.com/Eyepan/yap/src/fetcher"
 	"github.com/Eyepan/yap/src/types"
-	"github.com/Masterminds/semver/v3"
+	"github.com/Eyepan/yap/src/utils"
 )
 
-// FetchPackageMetadata retrieves metadata for a given package.
-func FetchPackageMetadata(pkg types.Package, cache *fetcher.FSCache, npmrc types.Config) (types.VersionMetadata, error) {
+func FetchMetadata(pkg types.Package, npmrc types.Config, forceFetchAndRefresh bool) (*types.Metadata, error) {
+	cacheDir, err := utils.GetCacheDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cache directory: %w", err)
+	}
+	cacheFile := filepath.Join(cacheDir, utils.SanitizePackageName(pkg.Name))
+
+	// this if should only happen if force is false
+
+	// Check if the cache file exists
+	if _, err := os.Stat(cacheFile); !forceFetchAndRefresh && err == nil {
+		// Cache file exists, read its contents
+		data, err := os.ReadFile(cacheFile)
+		if err != nil {
+			return nil, err
+		}
+
+		buf := bytes.NewReader(data)
+		return utils.ReadMetadata(buf)
+	}
+
+	// Cache file does not exist, fetch metadata from the server
 	registryURL := npmrc["registry"]
 	packageURL := fmt.Sprintf("%s/%s", registryURL, pkg.Name)
-	data, err := cache.Fetch(packageURL, pkg.Name, config.ExtractAuthToken(npmrc))
+	authToken := utils.ExtractAuthToken(npmrc)
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("GET", packageURL, nil)
 	if err != nil {
-		return types.VersionMetadata{}, err
+		return nil, err
 	}
 
+	// Add the auth token to the request headers
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", authToken))
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the response body into a types.Metadata variable
 	var metadata types.Metadata
-	if err := json.Unmarshal(data, &metadata); err != nil {
-		return types.VersionMetadata{}, err
-	}
-
-	var exactVersion string
-	if pkg.Version == "latest" {
-		exactVersion = metadata.DistTags.Latest
-	} else if pkg.Version == "next" {
-		exactVersion = metadata.DistTags.Next
-	} else {
-		resolvedVersion, err := resolveVersion(pkg.Name, pkg.Version, getKeys(metadata.Versions))
-		if err != nil {
-			return types.VersionMetadata{}, err
-		}
-		exactVersion = resolvedVersion
-	}
-
-	return metadata.Versions[exactVersion], nil
-}
-
-// GetSubdependenciesFromMetadata extracts subdependencies from metadata.
-func GetSubdependenciesFromMetadata(metadata types.VersionMetadata) []types.Package {
-	var dependencies []types.Package
-	for name, version := range metadata.Dependencies {
-		dependencies = append(dependencies, types.Package{Name: name, Version: version})
-	}
-	return dependencies
-}
-
-// resolveVersion determines the appropriate version based on the constraint.
-func resolveVersion(pkgName, version string, versions []string) (string, error) {
-	var versionList []*semver.Version
-	for _, v := range versions {
-		ver, err := semver.NewVersion(v)
-		if err != nil {
-			continue
-		}
-		versionList = append(versionList, ver)
-	}
-
-	sort.Sort(semver.Collection(versionList))
-
-	constraint, err := semver.NewConstraint(version)
+	err = json.Unmarshal(body, &metadata)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	for _, ver := range versionList {
-		if constraint.Check(ver) {
-			return ver.String(), nil
-		}
+	// Ensure the cache directory exists
+	if err := os.MkdirAll(cacheDir, os.ModePerm); err != nil {
+		return nil, err
 	}
 
-	return "", fmt.Errorf("no matching version found for %s %s", pkgName, version)
+	// Write the metadata to the cache file in binary format
+	var buf bytes.Buffer
+	if err := utils.WriteMetadata(&buf, metadata); err != nil {
+		return nil, err
+	}
+
+	file, err := os.Create(cacheFile)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	if _, err := file.Write(buf.Bytes()); err != nil {
+		return nil, err
+	}
+
+	return &metadata, nil
 }
 
-// getKeys returns the keys from a map.
-func getKeys(m map[string]types.VersionMetadata) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
+func FetchVersionMetadata(pkg types.Package, npmrc types.Config, forceFetchAndRefresh bool) (types.VersionMetadata, error) {
+	md, err := FetchMetadata(pkg, npmrc, forceFetchAndRefresh)
+	if err != nil {
+		return types.VersionMetadata{}, fmt.Errorf("failed to fetch metadata for package %s@%s: %w", pkg.Name, pkg.Version, err)
 	}
-	return keys
+	versionsList := make([]string, len(md.Versions))
+	i := 0
+	for k := range md.Versions {
+		versionsList[i] = k
+		i++
+	}
+	resolvedVersion, err := utils.ResolveVersionForPackage(pkg, versionsList)
+	if err != nil {
+		return types.VersionMetadata{}, fmt.Errorf("failed to resolve version for package %s@%s: %w", pkg.Name, pkg.Version, err)
+	}
+
+	return md.Versions[resolvedVersion], nil
+}
+
+func GetListOfDependenciesFromVersionMetadata(md types.VersionMetadata) []types.Package {
+	deps := make([]types.Package, len(md.Dependencies))
+	i := 0
+	for key, value := range md.Dependencies {
+		deps[i] = types.Package{Name: key, Version: value}
+		i++
+	}
+
+	return deps
 }
