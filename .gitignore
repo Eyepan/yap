@@ -4,6 +4,8 @@ store/
 cache/
 node_modules/
 pnpm-lock.yaml
+*.lockb
+
 
 main
 
