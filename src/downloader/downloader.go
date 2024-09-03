@@ -29,13 +29,14 @@ func (pr *ProgressReader) Read(p []byte) (int, error) {
 	pr.progress += int64(n)
 
 	// Report progress
-	fmt.Printf("\rDownloading from %s %.2f%% complete", pr.name, float64(pr.progress)/float64(pr.total)*100)
+	// fmt.Sprintf("\rDownloading from %s %.2f%% complete", pr.name, float64(pr.progress)/float64(pr.total)*100)
 
 	return n, err
 }
 
 func DownloadPackage(pkg types.Package, tarballURL string, npmrc types.Config, force bool) (bool, error) {
 	if check, _ := CheckIfPackageIsAlreadyDownloaded(pkg); !force && check {
+		slog.Info(fmt.Sprintf("%s@%s has already been downloaded. Reusing this from the store", pkg.Name, pkg.Version))
 		return true, nil
 	}
 	tarballData, err := DownloadTarball(tarballURL, npmrc)
@@ -89,7 +90,7 @@ func DownloadTarball(tarballURL string, npmrc types.Config) (*bytes.Buffer, erro
 	}
 
 	// Print a final newline after the progress is complete
-	fmt.Println("\nDownload complete")
+	// fmt.Println("\nDownload complete")
 
 	return &tarballData, nil
 }
@@ -165,7 +166,8 @@ func CheckIfPackageIsAlreadyDownloaded(pkg types.Package) (bool, error) {
 		return false, fmt.Errorf("failed to get store directory: %w", err)
 	}
 
-	packagePath := filepath.Join(storeDir, fmt.Sprintf("%s@%s", pkg.Name, pkg.Version))
+	packagePath := filepath.Join(storeDir, utils.SanitizePackageName(fmt.Sprintf("%s@%s", pkg.Name, pkg.Version)))
+
 	if _, err := os.Stat(packagePath); os.IsNotExist(err) {
 		return false, nil
 	} else if err != nil {

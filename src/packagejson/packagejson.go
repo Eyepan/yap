@@ -23,3 +23,17 @@ func ParsePackageJSON() (types.PackageJSON, error) {
 
 	return pkgJSON, nil
 }
+
+func GetAllDependencies(pkgJSON *types.PackageJSON) types.Dependencies {
+	deps := make(types.Dependencies)
+	for name, version := range pkgJSON.PeerDependencies {
+		deps[name] = version
+	}
+	for name, version := range pkgJSON.DevDependencies {
+		deps[name] = version
+	}
+	for name, version := range pkgJSON.Dependencies {
+		deps[name] = version
+	}
+	return deps
+}
