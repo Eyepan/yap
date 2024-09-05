@@ -1,13 +1,21 @@
-BIN_NAME=yap
+${GOOS}BIN_NAME=yap
 .DEFAULT_GOAL := run
 
+# Detect platform
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	GOOS := linux
+else ifeq ($(UNAME_S),Darwin)
+	GOOS := darwin
+else ifeq ($(UNAME_S),Windows)
+	GOOS := windows
+endif
+
 build:
-	GOARCH=amd64 GOOS=darwin go build -o ./target/${BIN_NAME}-darwin main.go
-	GOARCH=amd64 GOOS=windows go build -o ./target/${BIN_NAME}-windows main.go
-	GOARCH=amd64 GOOS=linux go build -o ./target/${BIN_NAME}-linux main.go
+	GOARCH=amd64 GOOS=${GOOS} go build -o ./target/${BIN_NAME}-${GOOS} main.go
 
 run: build
-	./target/${BIN_NAME}-linux
+	./target/${BIN_NAME}-${GOOS}
 
 build_and_run: build run
 
@@ -22,7 +30,7 @@ test_coverage:
 	go test ./... -coverprofile=coverage.out
 
 dep:
-	go mod downlaoad
+	go mod download
 
 vet:
 	go vet
