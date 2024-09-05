@@ -187,31 +187,31 @@ func writePackage(buf *bytes.Buffer, pkg types.Package) error {
 	return nil
 }
 
-func writeMPackage(buf *bytes.Buffer, mpkg *types.MPackage) error {
-	if err := writeString(buf, mpkg.Name); err != nil {
+func writeMPackage(buf *bytes.Buffer, mPackage *types.MPackage) error {
+	if err := writeString(buf, mPackage.Name); err != nil {
 		return err
 	}
-	if err := writeString(buf, mpkg.Version); err != nil {
+	if err := writeString(buf, mPackage.Version); err != nil {
 		return err
 	}
-	if err := writeString(buf, mpkg.Id); err != nil {
+	if err := writeString(buf, mPackage.Id); err != nil {
 		return err
 	}
-	if err := writeString(buf, mpkg.Dist.Shasum); err != nil {
+	if err := writeString(buf, mPackage.Dist.Shasum); err != nil {
 		return err
 	}
-	if err := writeString(buf, mpkg.Dist.Tarball); err != nil {
+	if err := writeString(buf, mPackage.Dist.Tarball); err != nil {
 		return err
 	}
-	if err := binary.Write(buf, binary.LittleEndian, mpkg.Dist.FileCount); err != nil {
+	if err := binary.Write(buf, binary.LittleEndian, mPackage.Dist.FileCount); err != nil {
 		return err
 	}
 
 	// Write Dependencies recursively
-	if err := binary.Write(buf, binary.LittleEndian, int32(len(mpkg.Dependencies))); err != nil {
+	if err := binary.Write(buf, binary.LittleEndian, int32(len(mPackage.Dependencies))); err != nil {
 		return err
 	}
-	for _, dep := range mpkg.Dependencies {
+	for _, dep := range mPackage.Dependencies {
 		if err := writeMPackage(buf, dep); err != nil {
 			return err
 		}
@@ -235,8 +235,8 @@ func WriteLockfile(buf *bytes.Buffer, lockfile types.Lockfile) error {
 	if err := binary.Write(buf, binary.LittleEndian, int32(len(lockfile.Resolutions))); err != nil {
 		return err
 	}
-	for _, mpkg := range lockfile.Resolutions {
-		if err := writeMPackage(buf, mpkg); err != nil {
+	for _, mPackage := range lockfile.Resolutions {
+		if err := writeMPackage(buf, mPackage); err != nil {
 			return err
 		}
 	}
@@ -259,25 +259,25 @@ func readPackage(buf *bytes.Reader) (types.Package, error) {
 }
 
 func readMPackage(buf *bytes.Reader) (*types.MPackage, error) {
-	var mpkg types.MPackage
+	var mPackage types.MPackage
 	var err error
 
-	if mpkg.Name, err = readString(buf); err != nil {
+	if mPackage.Name, err = readString(buf); err != nil {
 		return nil, err
 	}
-	if mpkg.Version, err = readString(buf); err != nil {
+	if mPackage.Version, err = readString(buf); err != nil {
 		return nil, err
 	}
-	if mpkg.Id, err = readString(buf); err != nil {
+	if mPackage.Id, err = readString(buf); err != nil {
 		return nil, err
 	}
-	if mpkg.Dist.Shasum, err = readString(buf); err != nil {
+	if mPackage.Dist.Shasum, err = readString(buf); err != nil {
 		return nil, err
 	}
-	if mpkg.Dist.Tarball, err = readString(buf); err != nil {
+	if mPackage.Dist.Tarball, err = readString(buf); err != nil {
 		return nil, err
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &mpkg.Dist.FileCount); err != nil {
+	if err := binary.Read(buf, binary.LittleEndian, &mPackage.Dist.FileCount); err != nil {
 		return nil, err
 	}
 
@@ -286,16 +286,16 @@ func readMPackage(buf *bytes.Reader) (*types.MPackage, error) {
 	if err := binary.Read(buf, binary.LittleEndian, &depCount); err != nil {
 		return nil, err
 	}
-	mpkg.Dependencies = make([]*types.MPackage, depCount)
+	mPackage.Dependencies = make([]*types.MPackage, depCount)
 	for i := 0; i < int(depCount); i++ {
 		dep, err := readMPackage(buf)
 		if err != nil {
 			return nil, err
 		}
-		mpkg.Dependencies[i] = dep
+		mPackage.Dependencies[i] = dep
 	}
 
-	return &mpkg, nil
+	return &mPackage, nil
 }
 
 func ReadLockfile(buf *bytes.Reader) (*types.Lockfile, error) {
@@ -322,11 +322,11 @@ func ReadLockfile(buf *bytes.Reader) (*types.Lockfile, error) {
 	}
 	lockfile.Resolutions = make([]*types.MPackage, resCount)
 	for i := 0; i < int(resCount); i++ {
-		mpkg, err := readMPackage(buf)
+		mPackage, err := readMPackage(buf)
 		if err != nil {
 			return nil, err
 		}
-		lockfile.Resolutions[i] = mpkg
+		lockfile.Resolutions[i] = mPackage
 	}
 
 	return &lockfile, nil

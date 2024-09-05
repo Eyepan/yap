@@ -22,11 +22,11 @@ func ReadLock() (*types.Lockfile, error) {
 
 	}
 	buf := bytes.NewReader(data)
-	lockbin, err := ReadLockfile(buf)
+	lockBin, err := ReadLockfile(buf)
 	if err != nil {
 		return nil, fmt.Errorf("something went wrong while reading the lockfile: %w", err)
 	}
-	return lockbin, nil
+	return lockBin, nil
 }
 
 func DoesLockfileExist() (bool, error) {
@@ -38,11 +38,11 @@ func DoesLockfileExist() (bool, error) {
 	return true, nil
 }
 
-func WriteLock(lockbin types.Lockfile) error {
+func WriteLock(lockBin types.Lockfile) error {
 	lockFilePath := filepath.Join(".", "yap.lockb")
 
 	var buf bytes.Buffer
-	if err := WriteLockfile(&buf, lockbin); err != nil {
+	if err := WriteLockfile(&buf, lockBin); err != nil {
 		return fmt.Errorf("failed to write lockfile: %w", err)
 	}
 	file, err := os.Create(lockFilePath)
