@@ -28,12 +28,14 @@ jobs:
             - name: Install dependencies
               run: go get .
 
-            # Build code
-            - name: Build
-              run: go build -v ./...
+            # Build the binary
+            - name: Build the binary
+              run: |
+                  # Build the binary for the current platform
+                  go build -o yap
 
-            # Test code
-            - name: Test
+            # Test the code
+            - name: Run tests
               run: go test -v ./...
 
             # Determine version and tag
@@ -65,21 +67,21 @@ jobs:
                   # Set the new version as an output
                   echo "::set-output name=version::$new_version"
 
-                  # Create a new Git tag
+                  # Tag the new version and push the tag to the repository
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
                   git tag -a "$new_version" -m "Release $new_version"
                   git push origin "$new_version"
 
-            # Upload the artifact (build)
-            - name: Upload build artifacts
+            # Upload the compiled binary as an artifact
+            - name: Upload binary as artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: go-build-${{ steps.version_tag.outputs.version }}
-                  path: ./path_to_build_artifact
+                  name: yap-${{ steps.version_tag.outputs.version }}
+                  path: ./yap
 
-            # Optional: Publish the release on GitHub
-            - name: Create GitHub Release
+            # Create a release and upload the binary
+            - name: Create GitHub Release and upload binary
               uses: actions/create-release@v1
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -88,3 +90,4 @@ jobs:
                   release_name: "Release ${{ steps.version_tag.outputs.version }}"
                   draft: false
                   prerelease: false
+                  files: ./yap # Attach the compiled binary to the release
