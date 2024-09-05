@@ -1,0 +1,90 @@
+name: Go CI/CD
+
+on:
+    push:
+        branches:
+            - master
+            - dev
+    pull_request:
+        branches:
+            - master
+            - dev
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            # Checkout code
+            - uses: actions/checkout@v4
+
+            # Setup Go
+            - name: Setup Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: 1.23
+
+            # Install dependencies
+            - name: Install dependencies
+              run: go get .
+
+            # Build code
+            - name: Build
+              run: go build -v ./...
+
+            # Test code
+            - name: Test
+              run: go test -v ./...
+
+            # Determine version and tag
+            - name: Set version and tag
+              id: version_tag
+              run: |
+                  # Read current version from file or default to 0.0.0
+                  version=$(cat VERSION 2>/dev/null || echo "0.0.0")
+
+                  # Split version into major, minor, and patch
+                  IFS='.' read -r major minor patch <<< "$version"
+
+                  if [ "${{ github.ref }}" == "refs/heads/master" ]; then
+                    # Increment minor version for master
+                    minor=$((minor + 1))
+                    patch=0
+                  elif [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+                    # Increment patch version for dev
+                    patch=$((patch + 1))
+                  fi
+
+                  # Create new version
+                  new_version="$major.$minor.$patch"
+                  echo "New version: $new_version"
+
+                  # Update version file
+                  echo "$new_version" > VERSION
+
+                  # Set the new version as an output
+                  echo "::set-output name=version::$new_version"
+
+                  # Create a new Git tag
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git tag -a "$new_version" -m "Release $new_version"
+                  git push origin "$new_version"
+
+            # Upload the artifact (build)
+            - name: Upload build artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: go-build-${{ steps.version_tag.outputs.version }}
+                  path: ./path_to_build_artifact
+
+            # Optional: Publish the release on GitHub
+            - name: Create GitHub Release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ steps.version_tag.outputs.version }}
+                  release_name: "Release ${{ steps.version_tag.outputs.version }}"
+                  draft: false
+                  prerelease: false
