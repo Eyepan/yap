@@ -24,7 +24,6 @@ jobs:
 
             - name: Create build artifact
               run: mkdir -p build && mv yap build/
-              # Artifacts will be available in the `build` folder
 
             - name: Upload build artifact
               uses: actions/upload-artifact@v3
