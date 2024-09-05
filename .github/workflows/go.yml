@@ -68,7 +68,16 @@ jobs:
                   NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
                   echo "::set-output name=new_version::$NEW_VERSION"
 
-            - name: Create Git tag
+            - name: Check if tag already exists
+              id: check_tag
+              run: |
+                  if git rev-parse "refs/tags/${{ steps.semver.outputs.new_version }}" >/dev/null 2>&1; then
+                    echo "Tag already exists"
+                    exit 0
+                  fi
+
+            - name: Create Git tag (if it doesn't exist)
+              if: steps.check_tag.outputs.result != 'Tag already exists'
               run: |
                   git config user.name "github-actions"
                   git config user.email "github-actions@github.com"
@@ -82,7 +91,7 @@ jobs:
                   release_name: Release ${{ steps.semver.outputs.new_version }}
                   draft: false
                   prerelease: false
-                  token: ${{ secrets.GITHUB_TOKEN }} # Add GitHub token for authentication
+                  token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Upload binary to release
               uses: actions/upload-release-asset@v1
