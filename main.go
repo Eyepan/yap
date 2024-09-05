@@ -16,10 +16,6 @@ import (
 	"github.com/Eyepan/yap/src/utils"
 )
 
-// Init application
-func Init() {
-}
-
 func main() {
 	slog.SetLogLoggerLevel(slog.LevelWarn)
 	// Load configurations
@@ -28,15 +24,12 @@ func main() {
 		log.Fatalf("Failed to load configurations: %v", err)
 	}
 
-	var resolveCount = 0
-	var totalResolveCount = 0
-	var downloadCount = 0
-	var totalDownloadCount = 0
+	stats := logger.Stats{}
 
 	// Parse the command input (for now, assume 'install')
 	command := "install" // this would be dynamically set by the CLI parser
 	if command == "install" {
-		logger.PrettyPrintStats(resolveCount, totalResolveCount, downloadCount, totalDownloadCount)
+		stats.PrettyPrintStats()
 
 		// Parse package.json to get core dependencies
 		pkgJSON, err := packagejson.ParsePackageJSON()
@@ -55,19 +48,18 @@ func main() {
 
 		// Start download workers
 		numWorkers := runtime.NumCPU() // Number of concurrent download workers
-		go startDownloadWorkers(numWorkers, downloads, config, &resolveCount, &totalResolveCount, &downloadCount, &totalDownloadCount)
+		go startDownloadWorkers(numWorkers, downloads, config, &stats)
 
 		// Start resolving core dependencies
 		go func() {
 			for name, version := range packagejson.GetAllDependencies(&pkgJSON) {
 				pkg := types.Package{Name: name, Version: version}
 				lockBin.CoreDependencies = append(lockBin.CoreDependencies, pkg)
-				totalResolveCount += 1
-				logger.PrettyPrintStats(resolveCount, totalResolveCount, downloadCount, totalDownloadCount)
+				stats.IncrementTotalResolveCount()
 				wg.Add(1)
 				go func(pkg types.Package) {
 					defer wg.Done()
-					resolved, err := resolvePackage(pkg, config, &resolveCount, &totalResolveCount, &downloadCount, &totalDownloadCount, downloads)
+					resolved, err := resolvePackage(pkg, config, &stats, downloads)
 					if err != nil {
 						log.Printf("Failed to resolve package %s: %v", pkg.Name, err)
 						return
@@ -93,16 +85,14 @@ func main() {
 }
 
 // Resolving process
-func resolvePackage(pkg types.Package, config types.Config, resolveCount *int, totalResolveCount *int, downloadCount *int, totalDownloadCount *int, downloads chan<- types.MPackage) (*types.MPackage, error) {
+func resolvePackage(pkg types.Package, config types.Config, stats *logger.Stats, downloads chan<- types.MPackage) (*types.MPackage, error) {
 	slog.Info(fmt.Sprintf("Fetching metadata for %s@%s", pkg.Name, pkg.Version))
 	vmd, err := metadata.FetchVersionMetadata(pkg, config, false)
 	if err != nil {
 		log.Fatalln("failed while fetching the metadata", err)
 	}
 	slog.Info(fmt.Sprintf("Done fetching metadata for %s@%s", pkg.Name, pkg.Version))
-	*resolveCount += 1
-	logger.PrettyPrintStats(*resolveCount, *totalResolveCount, *downloadCount, *totalDownloadCount)
-
+	stats.IncrementResolveCount()
 	// Send package for downloading
 	downloads <- types.MPackage{Name: vmd.Name, Version: vmd.Version, Dist: vmd.Dist}
 
@@ -116,9 +106,8 @@ func resolvePackage(pkg types.Package, config types.Config, resolveCount *int, t
 
 	for depName, depVersion := range vmd.Dependencies {
 		depPkg := types.Package{Name: depName, Version: depVersion}
-		*totalResolveCount += 1
-		logger.PrettyPrintStats(*resolveCount, *totalResolveCount, *downloadCount, *totalDownloadCount)
-		subResolved, err := resolvePackage(depPkg, config, resolveCount, totalResolveCount, downloadCount, totalDownloadCount, downloads)
+		stats.IncrementTotalResolveCount()
+		subResolved, err := resolvePackage(depPkg, config, stats, downloads)
 		if err != nil {
 			return nil, err
 		}
@@ -129,20 +118,18 @@ func resolvePackage(pkg types.Package, config types.Config, resolveCount *int, t
 }
 
 // Downloading process with worker pool
-func startDownloadWorkers(numWorkers int, downloads <-chan types.MPackage, config types.Config, resolveCount *int, totalResolveCount *int, downloadCount *int, totalDownloadCount *int) {
+func startDownloadWorkers(numWorkers int, downloads <-chan types.MPackage, config types.Config, stats *logger.Stats) {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for pkg := range downloads {
-				*totalDownloadCount += 1
-				logger.PrettyPrintStats(*resolveCount, *totalResolveCount, *downloadCount, *totalDownloadCount)
+				stats.IncrementTotalDownloadCount()
 				slog.Info(fmt.Sprintf("Downloading tarball for %s@%s", pkg.Name, pkg.Version))
 				err := downloader.DownloadPackage(types.Package{Name: pkg.Name, Version: pkg.Version}, pkg.Dist.Tarball, config, false)
 				if err != nil {
 					log.Printf("Failed to download package %s: %v", pkg.Name, err)
 					continue
 				}
-				*downloadCount += 1
-				logger.PrettyPrintStats(*resolveCount, *totalResolveCount, *downloadCount, *totalDownloadCount)
+				stats.IncrementDownloadCount()
 				slog.Info(fmt.Sprintf("Done downloading tarball for %s@%s", pkg.Name, pkg.Version))
 			}
 		}()
