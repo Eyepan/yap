@@ -17,7 +17,7 @@ Built in Go, made to be faster than pnpm but does the exact same, even down to t
 To install YAP, clone the repository and build the project:
 
 ```sh
-git clone https://github.com/yourusername/yap.git
+git clone https://github.com/Eyepan/yap.git
 cd yap
 go build -o yap main.go
 ```
