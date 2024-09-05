@@ -32,3 +32,8 @@ func ResolveVersionForPackage(pkg types.Package, availableVersions []string) (st
 
 	return "", fmt.Errorf("no matching version found for package %s@%s: found versions %v", pkg.Name, pkg.Version, availableVersions)
 }
+
+func DetermineIfPackageVersionIsResolvableDirectly(pkg types.Package) (string, error) {
+	// TODO:
+	return "", fmt.Errorf("hasn't been implemented yet")
+}
