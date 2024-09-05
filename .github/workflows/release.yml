@@ -28,6 +28,8 @@ jobs:
                   fi
                   echo "Current version is $VERSION"
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
+              env:
+                  GH_TOKEN: ${{ github.token }}
 
             - name: Calculate new version
               id: new_version
