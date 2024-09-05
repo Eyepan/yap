@@ -15,3 +15,4 @@
 -   [ ] Add `update` command
 -   [ ] Add `uninstall` command
 -   [ ] Checksum verification for files
+-   [ ] Install script
