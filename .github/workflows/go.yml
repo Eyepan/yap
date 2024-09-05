@@ -73,7 +73,18 @@ jobs:
                   git tag -a "$new_version" -m "Release $new_version"
                   git push origin "$new_version"
 
-            # Upload the compiled binary as an artifact
+            # Commit and push the updated version file
+            - name: Commit and push version file
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add VERSION
+                  git commit -m "Update version to ${{ steps.version_tag.outputs.version }}"
+                  git push
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            # Upload the compiled binary as an artifact (for download in workflow log)
             - name: Upload binary as artifact
               uses: actions/upload-artifact@v4
               with:
@@ -90,4 +101,5 @@ jobs:
                   release_name: "Release ${{ steps.version_tag.outputs.version }}"
                   draft: false
                   prerelease: false
-                  files: ./yap # Attach the compiled binary to the release
+                  body: "Release version ${{ steps.version_tag.outputs.version }}."
+                  files: ./yap
