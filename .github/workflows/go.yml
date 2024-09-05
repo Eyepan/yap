@@ -90,7 +90,8 @@ jobs:
                   release_name: Release ${{ steps.semver.outputs.new_version }}
                   draft: false
                   prerelease: false
-                  token: ${{ secrets.GITHUB_TOKEN }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
 
             - name: Upload binary to release
               uses: actions/upload-release-asset@v1
