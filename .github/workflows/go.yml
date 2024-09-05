@@ -1,0 +1,41 @@
+name: Build and Release
+
+on:
+    push:
+        branches:
+            - dev
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v3
+
+            - name: Set up Go
+              uses: actions/setup-go@v3
+              with:
+                  go-version: "1.23"
+
+            - name: Build
+              run: go build -o yap main.go
+
+            - name: Create Release
+              id: create_release
+              uses: softprops/action-gh-release@v1
+              with:
+                  tag_name: ${{ github.ref_name }}-pre
+                  name: Release ${{ github.ref_name }}-pre
+                  body: |
+                      Pre-release build for tag ${{ github.ref_name }}.
+                  draft: false
+                  prerelease: true
+
+            - name: Upload Release Asset
+              uses: actions/upload-release-asset@v1
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./yap
+                  asset_name: yap
+                  asset_content_type: application/octet-stream
