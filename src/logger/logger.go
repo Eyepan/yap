@@ -35,3 +35,7 @@ func (s *Stats) IncrementTotalDownloadCount() {
 	s.totalDownloadCount += 1
 	s.PrettyPrintStats()
 }
+
+func PrintCurrentCommand(command string) {
+	fmt.Println("\033[1m yap " + command + "\033[0m")
+}
