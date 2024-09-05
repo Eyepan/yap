@@ -3,6 +3,7 @@ name: Build and Release
 on:
     push:
         branches:
+            - master
             - dev
 
 jobs:
@@ -10,34 +11,73 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - name: Checkout repository
+            - name: Checkout code
               uses: actions/checkout@v3
 
             - name: Set up Go
-              uses: actions/setup-go@v3
+              uses: actions/setup-go@v4
               with:
                   go-version: "1.23"
 
-            - name: Build
+            - name: Build project
               run: go build -o yap main.go
 
-            - name: Create Release
-              id: create_release
-              uses: softprops/action-gh-release@v1
-              with:
-                  tag_name: ${{ github.ref_name }}-pre
-                  name: Release ${{ github.ref_name }}-pre
-                  body: |
-                      Pre-release build for tag ${{ github.ref_name }}.
-                  draft: false
-                  prerelease: true
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Create build artifact
+              run: mkdir -p build && mv yap build/
+              # Artifacts will be available in the `build` folder
 
-            - name: Upload Release Asset
+            - name: Upload build artifact
+              uses: actions/upload-artifact@v3
+              with:
+                  name: yap
+                  path: build/yap
+
+    release:
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Get the latest tag
+              id: get_tag
+              run: echo "::set-output name=tag::$(git describe --tags --abbrev=0)"
+
+            - name: Set version number
+              id: semver
+              run: |
+                  BRANCH=$(echo "${GITHUB_REF#refs/heads/}")
+                  CURRENT_TAG=${{ steps.get_tag.outputs.tag }}
+
+                  if [ "$BRANCH" == "master" ]; then
+                    # Increment minor version
+                    VERSION=$(echo $CURRENT_TAG | awk -F. '{$2+=1; print $1"."$2".0"}')
+                  else
+                    # Increment patch version
+                    VERSION=$(echo $CURRENT_TAG | awk -F. '{$3+=1; print $1"."$2"."$3}')
+                  fi
+
+                  echo "::set-output name=new_version::$VERSION"
+
+            - name: Create Git tag
+              run: |
+                  git config user.name "github-actions"
+                  git config user.email "github-actions@github.com"
+                  git tag ${{ steps.semver.outputs.new_version }}
+                  git push origin ${{ steps.semver.outputs.new_version }}
+
+            - name: Create a GitHub release
+              uses: actions/create-release@v1
+              with:
+                  tag_name: ${{ steps.semver.outputs.new_version }}
+                  release_name: Release ${{ steps.semver.outputs.new_version }}
+                  draft: false
+                  prerelease: false
+
+            - name: Upload binary to release
               uses: actions/upload-release-asset@v1
               with:
                   upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./yap
+                  asset_path: ./build/yap
                   asset_name: yap
                   asset_content_type: application/octet-stream

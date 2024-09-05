@@ -1,4 +1,4 @@
-# Roadmap to v0.1.0-alpha
+# Roadmap to v1.0.0
 
 -   [ ] Cleaner CLI Interface
 -   [ ] Better logging support (by implementing proper logging)
