@@ -22,7 +22,7 @@ jobs:
               id: get_version
               run: |
                   if gh release list --limit 1 | grep -qv ""; then
-                    VERSION=$(gh release list --limit 1 | head -n 1 | awk '{print $1}')
+                    VERSION=$(gh release list --limit 1 | head -n 1 | awk '{print $2}')
                   else
                     VERSION="0.0.0"
                   fi
