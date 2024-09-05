@@ -39,38 +39,47 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v3
 
-            - name: Get the latest tag
+            - name: Get the latest tag (or default to 0.1.0)
               id: get_tag
-              run: echo "::set-output name=tag::$(git describe --tags --abbrev=0)"
+              run: |
+                  TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
+                  echo "::set-output name=tag::$TAG"
 
             - name: Set version number
               id: semver
               run: |
                   BRANCH=$(echo "${GITHUB_REF#refs/heads/}")
                   CURRENT_TAG=${{ steps.get_tag.outputs.tag }}
+                  CURRENT_TAG=${CURRENT_TAG#v} # Strip the "v" prefix
+
+                  MAJOR=$(echo $CURRENT_TAG | cut -d. -f1)
+                  MINOR=$(echo $CURRENT_TAG | cut -d. -f2)
+                  PATCH=$(echo $CURRENT_TAG | cut -d. -f3)
 
                   if [ "$BRANCH" == "master" ]; then
                     # Increment minor version
-                    VERSION=$(echo $CURRENT_TAG | awk -F. '{$2+=1; print $1"."$2".0"}')
+                    MINOR=$((MINOR + 1))
+                    PATCH=0
                   else
                     # Increment patch version
-                    VERSION=$(echo $CURRENT_TAG | awk -F. '{$3+=1; print $1"."$2"."$3}')
+                    PATCH=$((PATCH + 1))
                   fi
 
-                  echo "::set-output name=new_version::$VERSION"
+                  NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+                  echo "::set-output name=new_version::v$NEW_VERSION"
 
             - name: Create Git tag
               run: |
                   git config user.name "github-actions"
                   git config user.email "github-actions@github.com"
-                  git tag ${{ steps.semver.outputs.new_version }}
-                  git push origin ${{ steps.semver.outputs.new_version }}
+                  git tag v${{ steps.semver.outputs.new_version }}
+                  git push origin v${{ steps.semver.outputs.new_version }}
 
             - name: Create a GitHub release
               uses: actions/create-release@v1
               with:
-                  tag_name: ${{ steps.semver.outputs.new_version }}
-                  release_name: Release ${{ steps.semver.outputs.new_version }}
+                  tag_name: v${{ steps.semver.outputs.new_version }}
+                  release_name: Release v${{ steps.semver.outputs.new_version }}
                   draft: false
                   prerelease: false
 
