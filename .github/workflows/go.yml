@@ -1,0 +1,105 @@
+name: Go CI/CD
+
+on:
+    push:
+        branches:
+            - master
+            - dev
+    pull_request:
+        branches:
+            - master
+            - dev
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            # Checkout code
+            - uses: actions/checkout@v4
+
+            # Setup Go
+            - name: Setup Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: 1.23
+
+            # Install dependencies
+            - name: Install dependencies
+              run: go get .
+
+            # Build the binary
+            - name: Build the binary
+              run: |
+                  # Build the binary for the current platform
+                  go build -o yap
+
+            # Test the code
+            - name: Run tests
+              run: go test -v ./...
+
+            # Determine version and tag
+            - name: Set version and tag
+              id: version_tag
+              run: |
+                  # Read current version from file or default to 0.0.0
+                  version=$(cat VERSION 2>/dev/null || echo "0.0.0")
+
+                  # Split version into major, minor, and patch
+                  IFS='.' read -r major minor patch <<< "$version"
+
+                  if [ "${{ github.ref }}" == "refs/heads/master" ]; then
+                    # Increment minor version for master
+                    minor=$((minor + 1))
+                    patch=0
+                  elif [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+                    # Increment patch version for dev
+                    patch=$((patch + 1))
+                  fi
+
+                  # Create new version
+                  new_version="$major.$minor.$patch"
+                  echo "New version: $new_version"
+
+                  # Update version file
+                  echo "$new_version" > VERSION
+
+                  # Set the new version as an output
+                  echo "::set-output name=version::$new_version"
+
+                  # Tag the new version and push the tag to the repository
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git tag -a "$new_version" -m "Release $new_version"
+                  git push origin "$new_version"
+
+            # Commit and push the updated version file
+            - name: Commit and push version file
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add VERSION
+                  git commit -m "Update version to ${{ steps.version_tag.outputs.version }}"
+                  git push
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            # Upload the compiled binary as an artifact (for download in workflow log)
+            - name: Upload binary as artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: yap-${{ steps.version_tag.outputs.version }}
+                  path: ./yap
+
+            # Create a release and upload the binary
+            - name: Create GitHub Release and upload binary
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ steps.version_tag.outputs.version }}
+                  release_name: "Release ${{ steps.version_tag.outputs.version }}"
+                  draft: false
+                  prerelease: false
+                  body: "Release version ${{ steps.version_tag.outputs.version }}."
+                  files: ./yap

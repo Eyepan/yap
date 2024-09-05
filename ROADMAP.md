@@ -1,5 +1,6 @@
-# Roadmap to v0.1.0-alpha
+# Roadmap to v1.0.0
 
+-   [ ] Install script that gets prebuilt binaries from pre-release/release and adds it to path
 -   [ ] Cleaner CLI Interface
 -   [ ] Better logging support (by implementing proper logging)
 -   [ ] Better npmrc parsing support (currently doesn't handle //<registry>/:\_auth=<token> properly)
@@ -15,4 +16,3 @@
 -   [ ] Add `update` command
 -   [ ] Add `uninstall` command
 -   [ ] Checksum verification for files
--   [ ] Install script
