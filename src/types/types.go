@@ -34,7 +34,7 @@ type Dist struct {
 
 type Lockfile struct {
 	CoreDependencies []Package
-	Resolutions      []*MPackage
+	Resolutions      []MPackage
 }
 
 type Metadata struct {

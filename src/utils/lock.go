@@ -12,7 +12,7 @@ import (
 func ReadLock() (*types.Lockfile, error) {
 	lockFilePath := filepath.Join(".", "yap.lockb")
 
-	if _, err := os.Stat(lockFilePath); err == nil {
+	if _, err := os.Stat(lockFilePath); err != nil {
 		return nil, fmt.Errorf("something went wrong while reading the lockfile: %w", err)
 	}
 

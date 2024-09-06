@@ -13,7 +13,7 @@ import (
 	"github.com/Eyepan/yap/src/utils"
 )
 
-func FetchMetadata(pkg types.Package, npmrc types.Config, forceFetchAndRefresh bool) (*types.Metadata, error) {
+func FetchMetadata(pkg *types.Package, npmrc *types.Config, forceFetchAndRefresh bool) (*types.Metadata, error) {
 	cacheDir, err := utils.GetCacheDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cache directory: %w", err)
@@ -35,7 +35,7 @@ func FetchMetadata(pkg types.Package, npmrc types.Config, forceFetchAndRefresh b
 	}
 
 	// Cache file does not exist, fetch metadata from the server
-	registryURL := npmrc["registry"]
+	registryURL := (*npmrc)["registry"]
 	packageURL := fmt.Sprintf("%s/%s", registryURL, pkg.Name)
 	authToken := utils.ExtractAuthToken(npmrc)
 
@@ -93,7 +93,7 @@ func FetchMetadata(pkg types.Package, npmrc types.Config, forceFetchAndRefresh b
 	return &metadata, nil
 }
 
-func FetchVersionMetadata(pkg types.Package, npmrc types.Config, forceFetchAndRefresh bool) (types.VersionMetadata, error) {
+func FetchVersionMetadata(pkg *types.Package, npmrc *types.Config, forceFetchAndRefresh bool) (types.VersionMetadata, error) {
 	md, err := FetchMetadata(pkg, npmrc, forceFetchAndRefresh)
 	if err != nil {
 		return types.VersionMetadata{}, fmt.Errorf("failed to fetch metadata for package %s@%s: %w", pkg.Name, pkg.Version, err)
@@ -112,10 +112,10 @@ func FetchVersionMetadata(pkg types.Package, npmrc types.Config, forceFetchAndRe
 	return md.Versions[resolvedVersion], nil
 }
 
-func GetListOfDependenciesFromVersionMetadata(md types.VersionMetadata) []types.Package {
+func GetListOfDependenciesFromVersionMetadata(md *types.VersionMetadata) []types.Package {
 	deps := make([]types.Package, len(md.Dependencies))
 	i := 0
-	for key, value := range md.Dependencies {
+	for key, value := range (*md).Dependencies {
 		deps[i] = types.Package{Name: key, Version: value}
 		i++
 	}
