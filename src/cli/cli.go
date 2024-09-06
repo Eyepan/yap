@@ -9,7 +9,7 @@ import (
 )
 
 func HandleArgs() {
-	slog.SetLogLoggerLevel(slog.LevelWarn)
+	// slog.SetLogLoggerLevel(slog.LevelWarn)
 	args := os.Args
 	if len(args) < 2 {
 		slog.Error("Must input a command")
@@ -22,9 +22,7 @@ func HandleArgs() {
 		HandleInstall()
 		// TODO: add/install packages
 	case "list":
-		logger.PrintCurrentCommand(args[1])
-		slog.Error("hasn't been implemented yet, sorry")
-		os.Exit(-1)
+		HandleList()
 	case "add":
 		logger.PrintCurrentCommand(args[1])
 		slog.Error("hasn't been implemented yet, sorry")

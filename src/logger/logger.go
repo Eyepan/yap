@@ -2,37 +2,47 @@ package logger
 
 import (
 	"fmt"
+	"sync"
 )
 
 type Stats struct {
-	resolveCount       int
-	totalResolveCount  int
-	downloadCount      int
-	totalDownloadCount int
+	ResolveCount       int
+	TotalResolveCount  int
+	DownloadCount      int
+	TotalDownloadCount int
+	statsMu            sync.Mutex
 }
 
 func (s *Stats) PrettyPrintStats() {
 	// TODO: figure out a way to implement proper printing without inputting all the four numbers all the time
-	fmt.Printf("\r🔍[%d/%d] 🚚[%d/%d]", s.resolveCount, s.totalResolveCount, s.downloadCount, s.totalDownloadCount)
+	fmt.Printf("\r🔍[%d/%d] 🚚[%d/%d]\t", s.ResolveCount, s.TotalResolveCount, s.DownloadCount, s.TotalDownloadCount)
 }
 
 func (s *Stats) IncrementResolveCount() {
-	s.resolveCount += 1
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	s.ResolveCount += 1
 	s.PrettyPrintStats()
 }
 
 func (s *Stats) IncrementTotalResolveCount() {
-	s.totalResolveCount += 1
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	s.TotalResolveCount += 1
 	s.PrettyPrintStats()
 }
 
 func (s *Stats) IncrementDownloadCount() {
-	s.downloadCount += 1
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	s.DownloadCount += 1
 	s.PrettyPrintStats()
 }
 
 func (s *Stats) IncrementTotalDownloadCount() {
-	s.totalDownloadCount += 1
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	s.TotalDownloadCount += 1
 	s.PrettyPrintStats()
 }
 

@@ -21,110 +21,109 @@ func HandleInstall() {
 	if err != nil {
 		log.Fatalf("Failed to load configurations: %v", err)
 	}
-
-	stats := logger.Stats{}
-	stats.PrettyPrintStats()
-
-	// Parse package.json to get core dependencies
 	pkgJSON, err := packagejson.ParsePackageJSON()
 	if err != nil {
 		log.Fatalf("Failed to parse package.json: %v", err)
 	}
+	stats := logger.Stats{}
 
-	// Resolve dependencies concurrently
 	var lockBin types.Lockfile
-	lockBin.CoreDependencies = []types.Package{}
+	var lockBinMutex sync.Mutex
 
-	results := make(chan *types.MPackage)
-	downloads := make(chan types.MPackage)
+	baseDependencies := packagejson.GetAllDependencies(&pkgJSON)
 
-	var wg sync.WaitGroup
+	numWorkers := runtime.NumCPU()
+	slog.Info(fmt.Sprintf("Running on %d CPU Cores", numWorkers))
 
-	// Start download workers
-	numWorkers := runtime.NumCPU() // Number of concurrent download workers
-	go startDownloadWorkers(numWorkers, downloads, config, &stats)
+	var metadataWg sync.WaitGroup
+	var downloadWg sync.WaitGroup
 
-	// Start resolving core dependencies
-	go func() {
-		for name, version := range packagejson.GetAllDependencies(&pkgJSON) {
-			pkg := types.Package{Name: name, Version: version}
-			lockBin.CoreDependencies = append(lockBin.CoreDependencies, pkg)
-			stats.IncrementTotalResolveCount()
-			wg.Add(1)
-			go func(pkg types.Package) {
-				defer wg.Done()
-				resolved, err := resolvePackage(pkg, config, &stats, downloads)
-				if err != nil {
-					log.Printf("Failed to resolve package %s: %v", pkg.Name, err)
-					return
-				}
-				results <- resolved
-			}(pkg)
-		}
-		wg.Wait()
-		close(results)
-		close(downloads)
-	}()
+	metadataChannel := make(chan *types.Package)
+	downloadChannel := make(chan *types.MPackage)
 
-	// Build the lockfile
-	lockBin.Resolutions = []*types.MPackage{}
-	for res := range results {
-		lockBin.Resolutions = append(lockBin.Resolutions, res)
-	}
-
-	utils.WriteLock(lockBin)
-
-	fmt.Println("\n💫Done!")
-}
-
-// Resolving process
-func resolvePackage(pkg types.Package, config types.Config, stats *logger.Stats, downloads chan<- types.MPackage) (*types.MPackage, error) {
-	slog.Info(fmt.Sprintf("Fetching metadata for %s@%s", pkg.Name, pkg.Version))
-	vmd, err := metadata.FetchVersionMetadata(pkg, config, false)
-	if err != nil {
-		log.Fatalln("failed while fetching the metadata", err)
-	}
-	slog.Info(fmt.Sprintf("Done fetching metadata for %s@%s", pkg.Name, pkg.Version))
-	stats.IncrementResolveCount()
-	// Send package for downloading
-	downloads <- types.MPackage{Name: vmd.Name, Version: vmd.Version, Dist: vmd.Dist}
-
-	resolvedPkg := &types.MPackage{
-		Name:         vmd.Name,
-		Version:      vmd.Version,
-		Id:           vmd.ID,
-		Dist:         vmd.Dist,
-		Dependencies: []*types.MPackage{},
-	}
-
-	for depName, depVersion := range vmd.Dependencies {
-		depPkg := types.Package{Name: depName, Version: depVersion}
-		stats.IncrementTotalResolveCount()
-		subResolved, err := resolvePackage(depPkg, config, stats, downloads)
-		if err != nil {
-			return nil, err
-		}
-		resolvedPkg.Dependencies = append(resolvedPkg.Dependencies, subResolved)
-	}
-
-	return resolvedPkg, nil
-}
-
-// Downloading process with worker pool
-func startDownloadWorkers(numWorkers int, downloads <-chan types.MPackage, config types.Config, stats *logger.Stats) {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
-			for pkg := range downloads {
-				stats.IncrementTotalDownloadCount()
-				slog.Info(fmt.Sprintf("Downloading tarball for %s@%s", pkg.Name, pkg.Version))
-				err := downloader.DownloadPackage(types.Package{Name: pkg.Name, Version: pkg.Version}, pkg.Dist.Tarball, config, false)
-				if err != nil {
-					log.Printf("Failed to download package %s: %v", pkg.Name, err)
-					continue
-				}
-				stats.IncrementDownloadCount()
-				slog.Info(fmt.Sprintf("Done downloading tarball for %s@%s", pkg.Name, pkg.Version))
+			for pkg := range metadataChannel {
+				DownloadPackageMetadata(&metadataWg, &downloadWg, pkg, &config, downloadChannel, metadataChannel, &stats)
 			}
 		}()
+	}
+
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			for mPkg := range downloadChannel {
+				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin)
+			}
+		}()
+	}
+
+	metadataWg.Add(len(baseDependencies))
+	for name, version := range baseDependencies {
+		go func(name, version string) {
+			basePackage := types.Package{Name: name, Version: version}
+			metadataChannel <- &basePackage
+			lockBinMutex.Lock()
+			lockBin.CoreDependencies = append(lockBin.CoreDependencies, basePackage)
+			lockBinMutex.Unlock()
+		}(name, version)
+	}
+
+	metadataWg.Wait()
+	close(metadataChannel)
+
+	downloadWg.Wait()
+	close(downloadChannel)
+
+	utils.WriteLock(lockBin)
+	fmt.Println("\n💫 Done!")
+}
+
+func DownloadPackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.Package, config *types.Config, downloadChannel chan<- *types.MPackage, metadataChannel chan<- *types.Package, stats *logger.Stats) {
+	defer metadataWg.Done()
+	slog.Info(fmt.Sprintf("[METADATA] 🔃 %s@%s", pkg.Name, pkg.Version))
+
+	vmd, err := metadata.FetchVersionMetadata(pkg, config, false)
+	stats.IncrementResolveCount()
+
+	if err != nil {
+		slog.Error(fmt.Sprintf("[METADATA] ❌ %s@%s\t%v", pkg.Name, pkg.Version, err))
+		return
+	}
+
+	slog.Info(fmt.Sprintf("[METADATA] ✅ %s", vmd.ID))
+
+	packageToBeDownloaded := types.MPackage{
+		Name:    vmd.Name,
+		Version: vmd.Version,
+		Id:      vmd.ID,
+		Dist:    vmd.Dist,
+	}
+	stats.IncrementTotalDownloadCount()
+
+	downloadWg.Add(1)
+	downloadChannel <- &packageToBeDownloaded
+
+	for depName, depVersion := range vmd.Dependencies {
+		depPkg := &types.Package{Name: depName, Version: depVersion}
+		stats.IncrementTotalResolveCount()
+
+		metadataWg.Add(1)
+		go func(depPkg *types.Package) {
+			metadataChannel <- depPkg
+		}(depPkg)
+	}
+}
+
+func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, config *types.Config, stats *logger.Stats, lockBin *types.Lockfile) {
+	defer downloadWg.Done()
+	lockBin.Resolutions = append(lockBin.Resolutions, *mPkg)
+
+	slog.Info(fmt.Sprintf("[TARBALL] 🚚 %s", mPkg.Id))
+
+	if err := downloader.DownloadPackage(&types.Package{Name: mPkg.Name, Version: mPkg.Version}, &mPkg.Dist.Tarball, config, false); err != nil {
+		slog.Error(fmt.Sprintf("[TARBALL] ❌ %s\t%v", mPkg.Id, err))
+	} else {
+		stats.IncrementDownloadCount()
+		slog.Info(fmt.Sprintf("[TARBALL] ✅ %s", mPkg.Id))
 	}
 }
