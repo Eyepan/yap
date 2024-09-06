@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -12,7 +13,9 @@ func HandleList() {
 	if err != nil {
 		log.Fatalf("failed to read lockfile %v", err)
 	}
-	// TODO: Pretty print this properly
-	fmt.Printf("lockBin.CoreDependencies: %v\n", lockBin.CoreDependencies)
-	fmt.Printf("lockBin.Resolutions: %v\n", lockBin.Resolutions)
+	jsonData, err := json.MarshalIndent(lockBin, "", "\t")
+	if err != nil {
+		log.Fatalf("failed to parse lockfile into json %v", err)
+	}
+	fmt.Println(string(jsonData))
 }
