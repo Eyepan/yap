@@ -17,6 +17,7 @@ import (
 )
 
 func HandleInstall() {
+	// TODO: Read lockfile if exists, and use it for faster resolution
 	config, err := config.LoadConfigurations()
 	if err != nil {
 		log.Fatalf("Failed to load configurations: %v", err)
