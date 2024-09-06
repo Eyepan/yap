@@ -21,7 +21,6 @@ type Package struct {
 type MPackage struct {
 	Name         string
 	Version      string
-	Id           string
 	Dist         Dist
 	Dependencies []*MPackage
 }
@@ -39,7 +38,6 @@ type Lockfile struct {
 
 type Metadata struct {
 	Name     string `json:"name"`
-	ID       string `json:"_id"`
 	DistTags struct {
 		Latest string `json:"latest"`
 		Next   string `json:"next"`
@@ -50,7 +48,6 @@ type Metadata struct {
 type VersionMetadata struct {
 	Name         string       `json:"name"`
 	Version      string       `json:"version"`
-	ID           string       `json:"_id"`
 	Dist         Dist         `json:"dist"`
 	Dependencies Dependencies `json:"dependencies"`
 }

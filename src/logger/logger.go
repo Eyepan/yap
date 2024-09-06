@@ -14,7 +14,6 @@ type Stats struct {
 }
 
 func (s *Stats) PrettyPrintStats() {
-	// TODO: figure out a way to implement proper printing without inputting all the four numbers all the time
 	fmt.Printf("\r🔍[%d/%d] 🚚[%d/%d]\t", s.ResolveCount, s.TotalResolveCount, s.DownloadCount, s.TotalDownloadCount)
 }
 
