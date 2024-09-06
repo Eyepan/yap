@@ -24,9 +24,6 @@ func writeVersionMetadata(buf *bytes.Buffer, vm types.VersionMetadata) error {
 	if err := writeString(buf, vm.Version); err != nil {
 		return err
 	}
-	if err := writeString(buf, vm.ID); err != nil {
-		return err
-	}
 	if err := writeString(buf, vm.Dist.Shasum); err != nil {
 		return err
 	}
@@ -55,9 +52,6 @@ func writeVersionMetadata(buf *bytes.Buffer, vm types.VersionMetadata) error {
 
 func WriteMetadata(buf *bytes.Buffer, metadata types.Metadata) error {
 	if err := writeString(buf, metadata.Name); err != nil {
-		return err
-	}
-	if err := writeString(buf, metadata.ID); err != nil {
 		return err
 	}
 	if err := writeString(buf, metadata.DistTags.Latest); err != nil {
@@ -107,9 +101,6 @@ func readVersionMetadata(buf *bytes.Reader) (types.VersionMetadata, error) {
 	if vm.Version, err = readString(buf); err != nil {
 		return vm, err
 	}
-	if vm.ID, err = readString(buf); err != nil {
-		return vm, err
-	}
 	if vm.Dist.Shasum, err = readString(buf); err != nil {
 		return vm, err
 	}
@@ -145,9 +136,6 @@ func ReadMetadata(buf *bytes.Reader) (*types.Metadata, error) {
 	var err error
 
 	if metadata.Name, err = readString(buf); err != nil {
-		return nil, err
-	}
-	if metadata.ID, err = readString(buf); err != nil {
 		return nil, err
 	}
 	if metadata.DistTags.Latest, err = readString(buf); err != nil {
@@ -192,9 +180,6 @@ func writeMPackage(buf *bytes.Buffer, mPackage *types.MPackage) error {
 		return err
 	}
 	if err := writeString(buf, mPackage.Version); err != nil {
-		return err
-	}
-	if err := writeString(buf, mPackage.Id); err != nil {
 		return err
 	}
 	if err := writeString(buf, mPackage.Dist.Shasum); err != nil {
@@ -266,9 +251,6 @@ func readMPackage(buf *bytes.Reader) (*types.MPackage, error) {
 		return nil, err
 	}
 	if mPackage.Version, err = readString(buf); err != nil {
-		return nil, err
-	}
-	if mPackage.Id, err = readString(buf); err != nil {
 		return nil, err
 	}
 	if mPackage.Dist.Shasum, err = readString(buf); err != nil {

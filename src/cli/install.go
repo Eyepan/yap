@@ -53,7 +53,7 @@ func HandleInstall() {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for mPkg := range downloadChannel {
-				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin)
+				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin, &lockBinMutex)
 			}
 		}()
 	}
@@ -66,6 +66,7 @@ func HandleInstall() {
 			lockBinMutex.Lock()
 			lockBin.CoreDependencies = append(lockBin.CoreDependencies, basePackage)
 			lockBinMutex.Unlock()
+			stats.IncrementTotalResolveCount()
 		}(name, version)
 	}
 
@@ -91,12 +92,11 @@ func DownloadPackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.
 		return
 	}
 
-	slog.Info(fmt.Sprintf("[METADATA] ✅ %s", vmd.ID))
+	slog.Info(fmt.Sprintf("[METADATA] ✅ %s@%s", vmd.Name, vmd.Version))
 
 	packageToBeDownloaded := types.MPackage{
 		Name:    vmd.Name,
 		Version: vmd.Version,
-		Id:      vmd.ID,
 		Dist:    vmd.Dist,
 	}
 	stats.IncrementTotalDownloadCount()
@@ -115,16 +115,17 @@ func DownloadPackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.
 	}
 }
 
-func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, config *types.Config, stats *logger.Stats, lockBin *types.Lockfile) {
+func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, config *types.Config, stats *logger.Stats, lockBin *types.Lockfile, lockBinMutex *sync.Mutex) {
 	defer downloadWg.Done()
+	lockBinMutex.Lock()
 	lockBin.Resolutions = append(lockBin.Resolutions, *mPkg)
-
-	slog.Info(fmt.Sprintf("[TARBALL] 🚚 %s", mPkg.Id))
+	lockBinMutex.Unlock()
+	slog.Info(fmt.Sprintf("[TARBALL] 🚚 %s@%s", mPkg.Name, mPkg.Version))
 
 	if err := downloader.DownloadPackage(&types.Package{Name: mPkg.Name, Version: mPkg.Version}, &mPkg.Dist.Tarball, config, false); err != nil {
-		slog.Error(fmt.Sprintf("[TARBALL] ❌ %s\t%v", mPkg.Id, err))
+		slog.Error(fmt.Sprintf("[TARBALL] ❌ %s@%s\t%v", mPkg.Name, mPkg.Version, err))
 	} else {
 		stats.IncrementDownloadCount()
-		slog.Info(fmt.Sprintf("[TARBALL] ✅ %s", mPkg.Id))
+		slog.Info(fmt.Sprintf("[TARBALL] ✅ %s@%s", mPkg.Name, mPkg.Version))
 	}
 }
