@@ -34,7 +34,7 @@ func (pr *ProgressReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func DownloadPackage(pkg types.Package, tarballURL string, npmrc types.Config, force bool) error {
+func DownloadPackage(pkg *types.Package, tarballURL *string, npmrc *types.Config, force bool) error {
 	if check, _ := CheckIfPackageIsAlreadyDownloaded(pkg); !force && check {
 		slog.Info(fmt.Sprintf("%s@%s has already been downloaded. Reusing this from the store", pkg.Name, pkg.Version))
 		return nil
@@ -50,11 +50,11 @@ func DownloadPackage(pkg types.Package, tarballURL string, npmrc types.Config, f
 	return nil
 }
 
-func DownloadTarball(tarballURL string, npmrc types.Config) (*bytes.Buffer, error) {
+func DownloadTarball(tarballURL *string, npmrc *types.Config) (*bytes.Buffer, error) {
 	authToken := utils.ExtractAuthToken(npmrc)
 
 	// Create a new HTTP request
-	req, err := http.NewRequest("GET", tarballURL, nil)
+	req, err := http.NewRequest("GET", *tarballURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func DownloadTarball(tarballURL string, npmrc types.Config) (*bytes.Buffer, erro
 	progressReader := &ProgressReader{
 		Reader: resp.Body,
 		total:  totalSize,
-		name:   tarballURL,
+		name:   *tarballURL,
 	}
 
 	// Create a buffer to store the tarball data
@@ -160,7 +160,7 @@ func ExtractTarball(tarballData *bytes.Buffer, packageID string) error {
 	return nil
 }
 
-func CheckIfPackageIsAlreadyDownloaded(pkg types.Package) (bool, error) {
+func CheckIfPackageIsAlreadyDownloaded(pkg *types.Package) (bool, error) {
 	storeDir, err := utils.GetStoreDir()
 	if err != nil {
 		return false, fmt.Errorf("failed to get store directory: %w", err)

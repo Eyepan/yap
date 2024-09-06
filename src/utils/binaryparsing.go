@@ -236,7 +236,7 @@ func WriteLockfile(buf *bytes.Buffer, lockfile types.Lockfile) error {
 		return err
 	}
 	for _, mPackage := range lockfile.Resolutions {
-		if err := writeMPackage(buf, mPackage); err != nil {
+		if err := writeMPackage(buf, &mPackage); err != nil {
 			return err
 		}
 	}
@@ -320,13 +320,13 @@ func ReadLockfile(buf *bytes.Reader) (*types.Lockfile, error) {
 	if err := binary.Read(buf, binary.LittleEndian, &resCount); err != nil {
 		return nil, err
 	}
-	lockfile.Resolutions = make([]*types.MPackage, resCount)
+	lockfile.Resolutions = make([]types.MPackage, resCount)
 	for i := 0; i < int(resCount); i++ {
 		mPackage, err := readMPackage(buf)
 		if err != nil {
 			return nil, err
 		}
-		lockfile.Resolutions[i] = mPackage
+		lockfile.Resolutions[i] = *mPackage
 	}
 
 	return &lockfile, nil

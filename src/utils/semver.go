@@ -8,7 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
-func ResolveVersionForPackage(pkg types.Package, availableVersions []string) (string, error) {
+func ResolveVersionForPackage(pkg *types.Package, availableVersions []string) (string, error) {
 	versionList := make([]*semver.Version, len(availableVersions))
 	for i, v := range availableVersions {
 		version, err := semver.NewVersion(v)
@@ -19,7 +19,7 @@ func ResolveVersionForPackage(pkg types.Package, availableVersions []string) (st
 	}
 	sort.Sort(semver.Collection(versionList))
 
-	constraint, err := semver.NewConstraint(pkg.Version)
+	constraint, err := semver.NewConstraint((*pkg).Version)
 	if err != nil {
 		return "", err
 	}
@@ -31,4 +31,9 @@ func ResolveVersionForPackage(pkg types.Package, availableVersions []string) (st
 	}
 
 	return "", fmt.Errorf("no matching version found for package %s@%s: found versions %v", pkg.Name, pkg.Version, availableVersions)
+}
+
+func DetermineIfPackageVersionIsResolvableDirectly(pkg types.Package) (string, error) {
+	// TODO:
+	return "", fmt.Errorf("hasn't been implemented yet")
 }
