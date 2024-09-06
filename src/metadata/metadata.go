@@ -47,6 +47,7 @@ func FetchMetadata(pkg *types.Package, npmrc *types.Config, forceFetchAndRefresh
 
 	// Add the auth token to the request headers
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", authToken))
+	req.Header.Add("Accept", "application/vnd.npm.install-v1+json")
 
 	// Send the request
 	client := &http.Client{}
