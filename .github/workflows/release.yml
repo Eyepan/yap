@@ -46,7 +46,7 @@ jobs:
               run: GOARCH=amd64 GOOS=linux go build -o ./target/${{ github.event.repository.name }}-linux main.go
 
             - name: Build binaries for Windows
-              run: GOARCH=amd64 GOOS=windows go build -o ./target/${{ github.event.repository.name }}-windows main.go
+              run: GOARCH=amd64 GOOS=windows go build -o ./target/${{ github.event.repository.name }}-windows.exe main.go
 
             - name: Build binaries for MacOS
               run: GOARCH=amd64 GOOS=darwin go build -o ./target/${{ github.event.repository.name }}-darwin main.go
