@@ -5,6 +5,7 @@ cache/
 node_modules/
 pnpm-lock.yaml
 *.lockb
+package-lock.json
 
 
 target/
