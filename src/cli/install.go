@@ -42,10 +42,13 @@ func HandleInstall() {
 	metadataChannel := make(chan *types.Package)
 	downloadChannel := make(chan *types.MPackage)
 
+	// install map
+	var installedPackages sync.Map
+
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for pkg := range metadataChannel {
-				DownloadPackageMetadata(&metadataWg, &downloadWg, pkg, &config, downloadChannel, metadataChannel, &stats)
+				ResolvePackageMetadata(&metadataWg, &downloadWg, pkg, &config, downloadChannel, metadataChannel, &stats, &installedPackages)
 			}
 		}()
 	}
@@ -53,7 +56,7 @@ func HandleInstall() {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for mPkg := range downloadChannel {
-				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin, &lockBinMutex)
+				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin, &lockBinMutex, &installedPackages)
 			}
 		}()
 	}
@@ -80,8 +83,12 @@ func HandleInstall() {
 	fmt.Println("\n💫 Done!")
 }
 
-func DownloadPackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.Package, config *types.Config, downloadChannel chan<- *types.MPackage, metadataChannel chan<- *types.Package, stats *logger.Stats) {
+func ResolvePackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.Package, config *types.Config, downloadChannel chan<- *types.MPackage, metadataChannel chan<- *types.Package, stats *logger.Stats, installedPackages *sync.Map) {
 	defer metadataWg.Done()
+	if _, loaded := installedPackages.LoadOrStore(fmt.Sprintf("%s@%s", pkg.Name, pkg.Version), true); loaded {
+		stats.IncrementResolveCount()
+		return
+	}
 	slog.Info(fmt.Sprintf("[METADATA] 🔃 %s@%s", pkg.Name, pkg.Version))
 
 	vmd, err := metadata.FetchVersionMetadata(pkg, config, false)
@@ -115,8 +122,12 @@ func DownloadPackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.
 	}
 }
 
-func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, config *types.Config, stats *logger.Stats, lockBin *types.Lockfile, lockBinMutex *sync.Mutex) {
+func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, config *types.Config, stats *logger.Stats, lockBin *types.Lockfile, lockBinMutex *sync.Mutex, installedPackages *sync.Map) {
 	defer downloadWg.Done()
+	if _, loaded := installedPackages.LoadOrStore(fmt.Sprintf("%s@%s", mPkg.Name, mPkg.Version), true); loaded {
+		stats.IncrementDownloadCount()
+		return
+	}
 	lockBinMutex.Lock()
 	lockBin.Resolutions = append(lockBin.Resolutions, *mPkg)
 	lockBinMutex.Unlock()
@@ -124,8 +135,9 @@ func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, co
 
 	if err := downloader.DownloadPackage(&types.Package{Name: mPkg.Name, Version: mPkg.Version}, &mPkg.Dist.Tarball, config, false); err != nil {
 		slog.Error(fmt.Sprintf("[TARBALL] ❌ %s@%s\t%v", mPkg.Name, mPkg.Version, err))
-	} else {
-		stats.IncrementDownloadCount()
-		slog.Info(fmt.Sprintf("[TARBALL] ✅ %s@%s", mPkg.Name, mPkg.Version))
+		return
 	}
+
+	stats.IncrementDownloadCount()
+	slog.Info(fmt.Sprintf("[TARBALL] ✅ %s@%s", mPkg.Name, mPkg.Version))
 }
