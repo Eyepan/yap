@@ -1,51 +1,41 @@
 package config
 
 import (
+	"bytes"
+	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/Eyepan/yap/src/types"
+	"github.com/Eyepan/yap/src/utils"
 )
 
-// function that reads npmrc config
-func parseNpmrc(filePath string) (types.Config, error) {
-	config := make(types.Config)
-	content, err := os.ReadFile(filePath)
+func ReadYapConfig() (*types.YapConfig, error) {
+	configFile, err := utils.GetGlobalConfigDir()
+	var config types.YapConfig
 	if err != nil {
-		return config, err
+		return nil, err
 	}
-
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "#") {
-			continue
+	if _, err := os.Stat(configFile); err != nil {
+		// config file doesn't exist, create one
+		config = types.YapConfig{Registry: "https://registry.npmjs.org", LogLevel: "warn"}
+		var buf bytes.Buffer
+		if err := utils.WriteConfig(&buf, &config); err != nil {
+			return nil, fmt.Errorf("failed to write config to buffer: %w", err)
 		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
+		file, err := os.Create(configFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create config file in %s: %w", configFile, err)
 		}
-		config[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		defer file.Close()
+		if _, err := file.Write(buf.Bytes()); err != nil {
+			return nil, fmt.Errorf("failed to write to config file in %s: %w", configFile, err)
+		}
+		return &config, nil
 	}
-
-	return config, nil
-}
-
-func LoadConfigurations() (types.Config, error) {
-	config := types.Config{"registry": "https://registry.npmjs.org"}
-
-	homeDir, _ := os.UserHomeDir()
-	globalConfigPath := filepath.Join(homeDir, ".npmrc")
-	localConfigPath := filepath.Join(".", ".npmrc")
-
-	for _, path := range []string{globalConfigPath, localConfigPath} {
-		if cfg, err := parseNpmrc(path); err == nil {
-			for k, v := range cfg {
-				config[k] = v
-			}
-		}
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file in %s: %w", configFile, err)
 	}
-
-	return config, nil
+	buf := bytes.NewReader(data)
+	return utils.ReadConfig(buf)
 }

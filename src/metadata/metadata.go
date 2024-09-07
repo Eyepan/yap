@@ -13,7 +13,7 @@ import (
 	"github.com/Eyepan/yap/src/utils"
 )
 
-func FetchMetadata(pkg *types.Package, npmrc *types.Config, forceFetchAndRefresh bool) (*types.Metadata, error) {
+func FetchMetadata(pkg *types.Package, conf *types.YapConfig, forceFetchAndRefresh bool) (*types.Metadata, error) {
 	cacheDir, err := utils.GetCacheDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cache directory: %w", err)
@@ -35,9 +35,9 @@ func FetchMetadata(pkg *types.Package, npmrc *types.Config, forceFetchAndRefresh
 	}
 
 	// Cache file does not exist, fetch metadata from the server
-	registryURL := (*npmrc)["registry"]
+	registryURL := (*conf).Registry
+	authToken := (*conf).AuthToken
 	packageURL := fmt.Sprintf("%s/%s", registryURL, pkg.Name)
-	authToken := utils.ExtractAuthToken(npmrc)
 
 	// Create a new HTTP request
 	req, err := http.NewRequest("GET", packageURL, nil)
@@ -94,7 +94,7 @@ func FetchMetadata(pkg *types.Package, npmrc *types.Config, forceFetchAndRefresh
 	return &metadata, nil
 }
 
-func FetchVersionMetadata(pkg *types.Package, npmrc *types.Config, forceFetchAndRefresh bool) (types.VersionMetadata, error) {
+func FetchVersionMetadata(pkg *types.Package, npmrc *types.YapConfig, forceFetchAndRefresh bool) (types.VersionMetadata, error) {
 	md, err := FetchMetadata(pkg, npmrc, forceFetchAndRefresh)
 	if err != nil {
 		return types.VersionMetadata{}, fmt.Errorf("failed to fetch metadata for package %s@%s: %w", pkg.Name, pkg.Version, err)

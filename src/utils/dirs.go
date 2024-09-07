@@ -24,3 +24,17 @@ func GetStoreDir() (string, error) {
 	storeDir := filepath.Join(homeDir, ".yap_store")
 	return storeDir, nil
 }
+
+func GetGlobalConfigDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory for user: %w", err)
+	}
+	globalConfigDir := filepath.Join(homeDir, ".yap_config")
+	return globalConfigDir, nil
+}
+
+// TODO: local configuration
+// func GetLocalConfigDir() (string, error) {
+
+// }

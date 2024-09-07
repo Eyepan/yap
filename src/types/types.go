@@ -1,6 +1,12 @@
 package types
 
-type Config map[string]string
+type YapConfigLogLevel string
+
+type YapConfig struct {
+	Registry  string
+	AuthToken string
+	LogLevel  string
+}
 
 type Dependencies map[string]string
 
