@@ -3,6 +3,8 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"io"
 
 	"github.com/Eyepan/yap/src/types"
 )
@@ -312,4 +314,51 @@ func ReadLockfile(buf *bytes.Reader) (*types.Lockfile, error) {
 	}
 
 	return &lockfile, nil
+}
+
+func WriteConfig(buf *bytes.Buffer, conf *types.YapConfig) error {
+	if err := writeString(buf, conf.Registry); err != nil {
+		return err
+	}
+	if err := writeString(buf, conf.AuthToken); err != nil {
+		return err
+	}
+	if err := writeString(buf, string(conf.LogLevel)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ReadConfig(buf *bytes.Reader) (*types.YapConfig, error) {
+	var conf types.YapConfig
+	var err error
+
+	// Read Registry
+	conf.Registry, err = readString(buf)
+	if err != nil {
+		if err == io.EOF {
+			return nil, fmt.Errorf("unexpected EOF while reading Registry: %w", err)
+		}
+		return nil, fmt.Errorf("error reading Registry: %w", err)
+	}
+
+	// Read AuthToken
+	conf.AuthToken, err = readString(buf)
+	if err != nil {
+		if err == io.EOF {
+			return nil, fmt.Errorf("unexpected EOF while reading AuthToken: %w", err)
+		}
+		return nil, fmt.Errorf("error reading AuthToken: %w", err)
+	}
+
+	// Read LogLevel
+	conf.LogLevel, err = readString(buf)
+	if err != nil {
+		if err == io.EOF {
+			return nil, fmt.Errorf("unexpected EOF while reading LogLevel: %w", err)
+		}
+		return nil, fmt.Errorf("error reading LogLevel: %w", err)
+	}
+
+	return &conf, nil
 }

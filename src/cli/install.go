@@ -18,7 +18,8 @@ import (
 
 func HandleInstall() {
 	// TODO: Read lockfile if exists, and use it for faster resolution
-	config, err := config.LoadConfigurations()
+	// config, err := config.LoadConfigurations()
+	config, err := config.ReadYapConfig()
 	if err != nil {
 		log.Fatalf("Failed to load configurations: %v", err)
 	}
@@ -48,7 +49,7 @@ func HandleInstall() {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for pkg := range metadataChannel {
-				ResolvePackageMetadata(&metadataWg, &downloadWg, pkg, &config, downloadChannel, metadataChannel, &stats, &installedPackages)
+				ResolvePackageMetadata(&metadataWg, &downloadWg, pkg, config, downloadChannel, metadataChannel, &stats, &installedPackages)
 			}
 		}()
 	}
@@ -56,7 +57,7 @@ func HandleInstall() {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for mPkg := range downloadChannel {
-				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin, &lockBinMutex, &installedPackages)
+				DownloadPackageTarball(&downloadWg, mPkg, config, &stats, &lockBin, &lockBinMutex, &installedPackages)
 			}
 		}()
 	}
@@ -83,7 +84,7 @@ func HandleInstall() {
 	fmt.Println("\n💫 Done!")
 }
 
-func ResolvePackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.Package, config *types.Config, downloadChannel chan<- *types.MPackage, metadataChannel chan<- *types.Package, stats *logger.Stats, installedPackages *sync.Map) {
+func ResolvePackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.Package, config *types.YapConfig, downloadChannel chan<- *types.MPackage, metadataChannel chan<- *types.Package, stats *logger.Stats, installedPackages *sync.Map) {
 	defer metadataWg.Done()
 	if _, loaded := installedPackages.LoadOrStore(fmt.Sprintf("%s@%s", pkg.Name, pkg.Version), true); loaded {
 		stats.IncrementResolveCount()
@@ -122,7 +123,7 @@ func ResolvePackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.P
 	}
 }
 
-func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, config *types.Config, stats *logger.Stats, lockBin *types.Lockfile, lockBinMutex *sync.Mutex, installedPackages *sync.Map) {
+func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, config *types.YapConfig, stats *logger.Stats, lockBin *types.Lockfile, lockBinMutex *sync.Mutex, installedPackages *sync.Map) {
 	defer downloadWg.Done()
 	if _, loaded := installedPackages.LoadOrStore(fmt.Sprintf("%s@%s", mPkg.Name, mPkg.Version), true); loaded {
 		stats.IncrementDownloadCount()

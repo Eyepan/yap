@@ -1,0 +1,74 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/Eyepan/yap/src/types"
+)
+
+// Define a custom type for log levels
+type LogLevel string
+
+const (
+	Debug LogLevel = "debug"
+	Warn  LogLevel = "warn"
+	Info  LogLevel = "info"
+)
+
+// making this configuration be used by arg parameters too
+// refer: https://github.com/pnpm/pnpm/blob/main/config/config/src/Config.ts
+type NpmConfig struct {
+	_authToken string
+	logLevel   LogLevel
+	registry   string
+
+	// proxy          string // TODO: implement this
+	// https_proxy    string // TODO: implement this
+	// include 		  string[] // TODO: implement this
+	// omit 		  string[] // TODO: implement this
+}
+
+// function that reads npmrc config
+func parseNpmrc(filePath string) (types.Config, error) {
+
+	config := make(types.Config)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return config, err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		config[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+	}
+
+	return config, nil
+}
+
+func LoadConfigurations() (types.Config, error) {
+	config := types.Config{"registry": "https://registry.npmjs.org"}
+
+	homeDir, _ := os.UserHomeDir()
+	globalConfigPath := filepath.Join(homeDir, ".npmrc")
+	localConfigPath := filepath.Join(".", ".npmrc")
+
+	for _, path := range []string{globalConfigPath, localConfigPath} {
+		if cfg, err := parseNpmrc(path); err == nil {
+			for k, v := range cfg {
+				config[k] = v
+			}
+		}
+	}
+
+	return config, nil
+}

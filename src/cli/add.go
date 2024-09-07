@@ -14,13 +14,15 @@ import (
 	"github.com/Eyepan/yap/src/types"
 )
 
+// TODO: reorganize code such that add.go and install.go isn't duplicated all the way
+
 func HandleAdd() {
 	args := os.Args
 	if len(args) <= 2 {
 		slog.Error("missing packages to install")
 		os.Exit(-1)
 	}
-	config, err := config.LoadConfigurations()
+	config, err := config.ReadYapConfig()
 	if err != nil {
 		log.Fatalf("Failed to load configurations: %v", err)
 	}
@@ -45,7 +47,7 @@ func HandleAdd() {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for pkg := range metadataChannel {
-				ResolvePackageMetadata(&metadataWg, &downloadWg, pkg, &config, downloadChannel, metadataChannel, &stats, &installedPackages)
+				ResolvePackageMetadata(&metadataWg, &downloadWg, pkg, config, downloadChannel, metadataChannel, &stats, &installedPackages)
 			}
 		}()
 	}
@@ -53,7 +55,7 @@ func HandleAdd() {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for mPkg := range downloadChannel {
-				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin, &lockBinMutex, &installedPackages)
+				DownloadPackageTarball(&downloadWg, mPkg, config, &stats, &lockBin, &lockBinMutex, &installedPackages)
 			}
 		}()
 	}
