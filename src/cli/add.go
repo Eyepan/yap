@@ -40,10 +40,12 @@ func HandleAdd() {
 	metadataChannel := make(chan *types.Package)
 	downloadChannel := make(chan *types.MPackage)
 
+	var installedPackages sync.Map
+
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for pkg := range metadataChannel {
-				DownloadPackageMetadata(&metadataWg, &downloadWg, pkg, &config, downloadChannel, metadataChannel, &stats)
+				ResolvePackageMetadata(&metadataWg, &downloadWg, pkg, &config, downloadChannel, metadataChannel, &stats, &installedPackages)
 			}
 		}()
 	}
@@ -51,13 +53,14 @@ func HandleAdd() {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for mPkg := range downloadChannel {
-				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin, &lockBinMutex)
+				DownloadPackageTarball(&downloadWg, mPkg, &config, &stats, &lockBin, &lockBinMutex, &installedPackages)
 			}
 		}()
 	}
 	if strings.ContainsRune(packageName, '@') {
 		splits := strings.Split(packageName, "@")
 		metadataWg.Add(1)
+		stats.IncrementTotalResolveCount()
 		metadataChannel <- &types.Package{Name: splits[0], Version: splits[1]}
 	}
 
