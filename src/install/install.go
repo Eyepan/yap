@@ -90,6 +90,7 @@ func ResolvePackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.P
 		Name:    vmd.Name,
 		Version: vmd.Version,
 		Dist:    vmd.Dist,
+		// Dependencies: vmd.Dependencies, // make this return a types.MPackage and redo this?
 	}
 	stats.IncrementTotalDownloadCount()
 
