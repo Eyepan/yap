@@ -21,7 +21,6 @@ func FetchMetadata(pkg *types.Package, conf *types.YapConfig, forceFetchAndRefre
 	cacheFile := filepath.Join(cacheDir, utils.SanitizePackageName(pkg.Name))
 
 	// this if should only happen if force is false
-
 	// Check if the cache file exists
 	if _, err := os.Stat(cacheFile); !forceFetchAndRefresh && err == nil {
 		// Cache file exists, read its contents
@@ -39,7 +38,6 @@ func FetchMetadata(pkg *types.Package, conf *types.YapConfig, forceFetchAndRefre
 	authToken := (*conf).AuthToken
 	packageURL := fmt.Sprintf("%s/%s", registryURL, pkg.Name)
 
-	// Create a new HTTP request
 	req, err := http.NewRequest("GET", packageURL, nil)
 	if err != nil {
 		return nil, err
@@ -47,7 +45,7 @@ func FetchMetadata(pkg *types.Package, conf *types.YapConfig, forceFetchAndRefre
 
 	// Add the auth token to the request headers
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", authToken))
-	req.Header.Add("Accept", "application/vnd.npm.install-v1+json")
+	req.Header.Add("Accept", "application/vnd.npm.install-v1+json") // compressed registry data, for faster metadata resolutions
 
 	// Send the request
 	client := &http.Client{}
@@ -105,7 +103,15 @@ func FetchVersionMetadata(pkg *types.Package, npmrc *types.YapConfig, forceFetch
 		versionsList[i] = k
 		i++
 	}
-	resolvedVersion, err := utils.ResolveVersionForPackage(pkg, versionsList)
+	var resolvedVersion string
+	switch pkg.Version {
+	case "latest":
+		resolvedVersion = md.DistTags.Latest
+	case "next":
+		resolvedVersion = md.DistTags.Next
+	default:
+		resolvedVersion, err = utils.ResolveVersionForPackage(pkg, versionsList)
+	}
 	if err != nil {
 		return types.VersionMetadata{}, fmt.Errorf("failed to resolve version for package %s@%s: %w", pkg.Name, pkg.Version, err)
 	}
