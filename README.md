@@ -1,3 +1,5 @@
+| ⚠️ Warning: This project is under VERY VERY active development. Things might break all the time, so please don't use this in production. A few suggested alternatives (that are not written in JS): [Cotton](https://github.com/danielhuang/cotton), [Zap](https://github.com/elbywan/zap), [Orogene](https://github.com/orogene/orogene)
+
 # YAP
 
 Yet-Another-Package manager
@@ -26,8 +28,24 @@ go build -o yap main.go
 
 To use Yap, run the following command
 
-```sh
-./yap install
+```
+Usage:
+./yap <command>
+Commands:
+help
+        prints this out!
+install
+        installs a list of packages
+list
+        list out packages from lockfile
+add     <package-name>@<!version>
+        adds this particular package to package.json and install it in the repository
+update <package-name>
+        updates the selected package to its latest version
+update --all
+        updates all dependencies to its latest version
+uninstall <package-name>
+        removes this package from the list of dependencies
 ```
 
 A better CLI interface is coming soon. Check out the [Roadmap](/ROADMAP.md) to see when it is coming
