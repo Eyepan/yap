@@ -45,7 +45,7 @@ func FetchMetadata(pkg *types.Package, conf *types.YapConfig, forceFetchAndRefre
 
 	// Add the auth token to the request headers
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", authToken))
-	req.Header.Add("Accept", "application/vnd.npm.install-v1+json") // compressed registry data, for faster metadata resolutions
+	// req.Header.Add("Accept", "application/vnd.npm.install-v1+json") // compressed registry data, for faster metadata resolutions
 
 	// Send the request
 	client := &http.Client{}
