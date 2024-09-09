@@ -34,12 +34,12 @@ func (pr *ProgressReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func DownloadPackage(pkg *types.Package, tarballURL *string, conf *types.YapConfig, force bool) error {
+func DownloadPackage(client *http.Client, pkg *types.Package, tarballURL *string, conf *types.YapConfig, force bool) error {
 	if check, _ := CheckIfPackageIsAlreadyDownloaded(pkg); !force && check {
 		slog.Info(fmt.Sprintf("%s@%s has already been downloaded. Reusing this from the store", pkg.Name, pkg.Version))
 		return nil
 	}
-	tarballData, err := DownloadTarball(tarballURL, conf)
+	tarballData, err := DownloadTarball(client, tarballURL, conf)
 	if err != nil {
 		return fmt.Errorf("failed while downloading tarball: %w", err)
 	}
@@ -50,7 +50,7 @@ func DownloadPackage(pkg *types.Package, tarballURL *string, conf *types.YapConf
 	return nil
 }
 
-func DownloadTarball(tarballURL *string, conf *types.YapConfig) (*bytes.Buffer, error) {
+func DownloadTarball(client *http.Client, tarballURL *string, conf *types.YapConfig) (*bytes.Buffer, error) {
 	authToken := (*conf).AuthToken
 
 	// Create a new HTTP request
@@ -63,7 +63,7 @@ func DownloadTarball(tarballURL *string, conf *types.YapConfig) (*bytes.Buffer, 
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", authToken))
 
 	// Send the request
-	client := &http.Client{}
+	// client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

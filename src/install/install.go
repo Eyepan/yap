@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"runtime"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/Eyepan/yap/src/config"
 	"github.com/Eyepan/yap/src/downloader"
@@ -13,6 +14,10 @@ import (
 	"github.com/Eyepan/yap/src/metadata"
 	"github.com/Eyepan/yap/src/types"
 )
+
+var client = &http.Client{
+	Timeout: time.Second * 30,
+}
 
 func InstallPackages(listOfPackages *types.Dependencies) {
 	config, err := config.ReadYapConfig()
@@ -23,7 +28,7 @@ func InstallPackages(listOfPackages *types.Dependencies) {
 
 	baseDependencies := *listOfPackages
 
-	numWorkers := runtime.NumCPU()
+	numWorkers := 200 // arbitrarily huge number
 	slog.Info(fmt.Sprintf("Running on %d CPU Cores", numWorkers))
 
 	var metadataWg sync.WaitGroup
@@ -35,6 +40,7 @@ func InstallPackages(listOfPackages *types.Dependencies) {
 	var installedPackages sync.Map
 
 	for i := 0; i < numWorkers; i++ {
+
 		go func() {
 			for pkg := range metadataChannel {
 				ResolvePackageMetadata(&metadataWg, &downloadWg, pkg, config, downloadChannel, metadataChannel, &stats, &installedPackages)
@@ -76,7 +82,7 @@ func ResolvePackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.P
 	}
 	slog.Info(fmt.Sprintf("[METADATA] 🔃 %s@%s", pkg.Name, pkg.Version))
 
-	vmd, err := metadata.FetchVersionMetadata(pkg, config, false)
+	vmd, err := metadata.FetchVersionMetadata(client, pkg, config, false)
 	stats.IncrementResolveCount()
 
 	if err != nil {
@@ -112,7 +118,7 @@ func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, co
 	defer downloadWg.Done()
 	slog.Info(fmt.Sprintf("[TARBALL] 🚚 %s@%s", mPkg.Name, mPkg.Version))
 
-	if err := downloader.DownloadPackage(&types.Package{Name: mPkg.Name, Version: mPkg.Version}, &mPkg.Dist.Tarball, config, false); err != nil {
+	if err := downloader.DownloadPackage(client, &types.Package{Name: mPkg.Name, Version: mPkg.Version}, &mPkg.Dist.Tarball, config, false); err != nil {
 		slog.Error(fmt.Sprintf("[TARBALL] ❌ %s@%s\t%v", mPkg.Name, mPkg.Version, err))
 		return
 	}
