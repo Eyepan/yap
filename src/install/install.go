@@ -40,7 +40,6 @@ func InstallPackages(listOfPackages *types.Dependencies) {
 	var installedPackages sync.Map
 
 	for i := 0; i < numWorkers; i++ {
-
 		go func() {
 			for pkg := range metadataChannel {
 				ResolvePackageMetadata(&metadataWg, &downloadWg, pkg, config, downloadChannel, metadataChannel, &stats, &installedPackages)

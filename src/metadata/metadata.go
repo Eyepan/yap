@@ -13,7 +13,7 @@ import (
 	"github.com/Eyepan/yap/src/utils"
 )
 
-func FetchMetadata(pkg *types.Package, conf *types.YapConfig, forceFetchAndRefresh bool) (*types.Metadata, error) {
+func FetchMetadata(client *http.Client, pkg *types.Package, conf *types.YapConfig, forceFetchAndRefresh bool) (*types.Metadata, error) {
 	cacheDir, err := utils.GetCacheDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cache directory: %w", err)
@@ -45,10 +45,9 @@ func FetchMetadata(pkg *types.Package, conf *types.YapConfig, forceFetchAndRefre
 
 	// Add the auth token to the request headers
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", authToken))
-	// req.Header.Add("Accept", "application/vnd.npm.install-v1+json") // compressed registry data, for faster metadata resolutions
+	req.Header.Add("Accept", "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*") // compressed registry data, for faster metadata resolutions
 
 	// Send the request
-	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -92,8 +91,8 @@ func FetchMetadata(pkg *types.Package, conf *types.YapConfig, forceFetchAndRefre
 	return &metadata, nil
 }
 
-func FetchVersionMetadata(pkg *types.Package, npmrc *types.YapConfig, forceFetchAndRefresh bool) (types.VersionMetadata, error) {
-	md, err := FetchMetadata(pkg, npmrc, forceFetchAndRefresh)
+func FetchVersionMetadata(client *http.Client, pkg *types.Package, npmrc *types.YapConfig, forceFetchAndRefresh bool) (types.VersionMetadata, error) {
+	md, err := FetchMetadata(client, pkg, npmrc, forceFetchAndRefresh)
 	if err != nil {
 		return types.VersionMetadata{}, fmt.Errorf("failed to fetch metadata for package %s@%s: %w", pkg.Name, pkg.Version, err)
 	}
