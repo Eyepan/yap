@@ -19,6 +19,11 @@ run: build
 
 build_and_run: build run
 
+install: build
+	cp ./target/${BIN_NAME}-${GOOS} /home/${USER}/bin/${BIN_NAME}
+	# cp ./target/${BIN_NAME}-${GOOS} /home/${USER}/bin/${BIN_NAME}
+	# copy .\target\${BIN_NAME}-${GOOS}.exe C:\Users\${USER}\bin\${BIN_NAME}.exe
+
 clean:
 	go clean
 	rimraf ./target
