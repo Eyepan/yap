@@ -10,4 +10,3 @@
 -   checksum verification
 -   list command that reads from lock file
 -   fix tarball extraction logic
--   proper cli structure with versioning (use flags instead of parsing os.Args yourself)
