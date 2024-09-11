@@ -75,40 +75,47 @@ func FetchVersionMetadata(client *http.Client, pkg *types.Package, conf *types.Y
 		return types.VersionMetadata{}, fmt.Errorf("failed to fetch metadata for package %s@%s: %w", pkg.Name, pkg.Version, err)
 	}
 
-	resolvedVersion := resolveVersion(pkg, metadata)
-	if err := checkResolvedVersion(resolvedVersion); err != nil {
+	resolvedVersion, err := resolveVersion(pkg, metadata)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("Failed to resolve version for %s@%s, refetching metadata...", pkg.Name, pkg.Version))
 		metadata, err = FetchMetadata(client, pkg, conf, true)
 		if err != nil {
-			return types.VersionMetadata{}, err
+			return types.VersionMetadata{}, fmt.Errorf("failed to refetch metadata for package %s@%s: %w", pkg.Name, pkg.Version, err)
 		}
-		resolvedVersion = resolveVersion(pkg, metadata)
+
+		resolvedVersion, err = resolveVersion(pkg, metadata)
+		if err != nil {
+			return types.VersionMetadata{}, fmt.Errorf("failed to resolve version for package %s after refetch: %w", pkg.Name, err)
+		}
 	}
-	if err := checkResolvedVersion(resolvedVersion); err != nil {
-		return types.VersionMetadata{}, fmt.Errorf("[METADATA] Failed to resolve version for package %s@%s", pkg.Name, pkg.Version)
+
+	slog.Info(fmt.Sprintf("[METADATA] Successfully resolved package %s@%s with version %s", pkg.Name, pkg.Version, resolvedVersion))
+
+	versionMetadata, ok := metadata.Versions[resolvedVersion]
+	if !ok {
+		return types.VersionMetadata{}, fmt.Errorf("version %s not found in metadata for package %s", resolvedVersion, pkg.Name)
 	}
-	slog.Info(fmt.Sprintf("[METADATA] Resolved package %s@%s with version %s", pkg.Name, pkg.Version, resolvedVersion))
-	return metadata.Versions[resolvedVersion], nil
+
+	return versionMetadata, nil
 }
 
-func resolveVersion(pkg *types.Package, metadata *types.Metadata) string {
+func resolveVersion(pkg *types.Package, metadata *types.Metadata) (string, error) {
 	switch pkg.Version {
 	case "latest":
-		return metadata.DistTags.Latest
+		return metadata.DistTags.Latest, nil
 	case "next":
-		return metadata.DistTags.Next
+		return metadata.DistTags.Next, nil
 	case "":
-		return metadata.DistTags.Latest
+		return metadata.DistTags.Latest, nil
 	case "*":
-		return metadata.DistTags.Latest
+		return metadata.DistTags.Latest, nil
 	default:
 		// handle edge case scenarios: https://docs.npmjs.com/cli/v10/configuring-npm/package-json#dependencies
 		if strings.HasPrefix(pkg.Version, "http://") || strings.HasPrefix(pkg.Version, "https://") || strings.HasPrefix(pkg.Version, "git://") || strings.HasPrefix(pkg.Version, "git+") || strings.HasPrefix(pkg.Version, "npm:") {
-			slog.Error(fmt.Sprintf("[METADATA] URL Prefixes aren't being handled now. Failed to handle %s", pkg.Version))
-			return ""
+			return "", fmt.Errorf("[METADATA] URL Prefixes aren't being handled now. Failed to handle %s", pkg.Version)
 		}
 		if strings.ContainsRune(pkg.Version, '/') {
-			slog.Error(fmt.Sprintf("[METADATA] Github URLs aren't being handled now. Failed to handle %s", pkg.Version))
-			return ""
+			return "", fmt.Errorf("[METADATA] Github URLs aren't being handled now. Failed to handle %s", pkg.Version)
 		}
 		versions := make([]string, len(metadata.Versions))
 		i := 0
@@ -117,15 +124,8 @@ func resolveVersion(pkg *types.Package, metadata *types.Metadata) string {
 			i++
 		}
 		resolved, _ := utils.ResolveVersionForPackage(pkg, versions)
-		return resolved
+		return resolved, nil
 	}
-}
-
-func checkResolvedVersion(version string) error {
-	if version == "" {
-		return fmt.Errorf("failed to resolve version")
-	}
-	return nil
 }
 
 func GetListOfDependenciesFromVersionMetadata(md *types.VersionMetadata) []types.Package {
