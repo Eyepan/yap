@@ -101,7 +101,7 @@ func resolveVersion(pkg *types.Package, metadata *types.Metadata) string {
 	case "*":
 		return metadata.DistTags.Latest
 	default:
-		// handle edge case scenarios:
+		// handle edge case scenarios: https://docs.npmjs.com/cli/v10/configuring-npm/package-json#dependencies
 		if strings.HasPrefix(pkg.Version, "http://") || strings.HasPrefix(pkg.Version, "https://") || strings.HasPrefix(pkg.Version, "git://") || strings.HasPrefix(pkg.Version, "git+") || strings.HasPrefix(pkg.Version, "npm:") {
 			slog.Error(fmt.Sprintf("[METADATA] URL Prefixes aren't being handled now. Failed to handle %s", pkg.Version))
 			return ""
