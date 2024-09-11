@@ -1,5 +1,5 @@
 ${GOOS}BIN_NAME=yap
-.DEFAULT_GOAL := run
+.DEFAULT_GOAL := build
 
 # Detect platform
 UNAME_S := $(shell uname -s)
