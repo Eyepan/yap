@@ -193,8 +193,8 @@ func writeMPackage(buf *bytes.Buffer, mPackage *types.MPackage) error {
 		return fmt.Errorf("failed to write mPackage dependencies count: %w", err)
 	}
 	for _, dep := range mPackage.Dependencies {
-		if err := writeMPackage(buf, dep); err != nil {
-			return fmt.Errorf("failed to write mPackage dependency: %w", err)
+		if err := writePackage(buf, dep); err != nil {
+			return fmt.Errorf("failed to write package dependency: %w", err)
 		}
 	}
 
@@ -261,9 +261,9 @@ func readMPackage(buf *bytes.Reader) (*types.MPackage, error) {
 	if err := binary.Read(buf, binary.LittleEndian, &depCount); err != nil {
 		return nil, fmt.Errorf("failed to read mPackage dependencies count: %w", err)
 	}
-	mPackage.Dependencies = make([]*types.MPackage, depCount)
+	mPackage.Dependencies = make([]types.Package, depCount)
 	for i := 0; i < int(depCount); i++ {
-		dep, err := readMPackage(buf)
+		dep, err := readPackage(buf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read mPackage dependency: %w", err)
 		}

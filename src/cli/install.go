@@ -7,12 +7,12 @@ import (
 	"github.com/Eyepan/yap/src/packagejson"
 )
 
-func HandleInstall() {
+func HandleInstall(force bool) {
 	pkgJSON, err := packagejson.ParsePackageJSON()
 	if err != nil {
 		log.Fatalf("Failed to parse package.json: %v", err)
 	}
 
 	baseDependencies := packagejson.GetAllDependencies(&pkgJSON)
-	install.InstallPackages(&baseDependencies)
+	install.InstallPackages(&baseDependencies, force)
 }

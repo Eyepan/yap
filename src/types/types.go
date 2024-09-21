@@ -28,7 +28,7 @@ type MPackage struct {
 	Name         string
 	Version      string
 	Dist         Dist
-	Dependencies []*MPackage
+	Dependencies []Package
 }
 
 type Dist struct {

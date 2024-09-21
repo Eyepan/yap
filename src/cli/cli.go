@@ -38,8 +38,11 @@ func HandleArgs() {
 	switch args[1] {
 	case "install":
 		logger.PrintCurrentCommand(args[1])
-		HandleInstall()
-		// TODO: add/install packages
+		if len(args) > 2 && (args[2] == "-f" || args[2] == "--force") {
+			HandleInstall(true)
+		} else {
+			HandleInstall(false)
+		}
 	case "list":
 		HandleList()
 	case "add":
