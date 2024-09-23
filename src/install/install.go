@@ -12,6 +12,7 @@ import (
 	"github.com/Eyepan/yap/src/downloader"
 	"github.com/Eyepan/yap/src/logger"
 	"github.com/Eyepan/yap/src/metadata"
+	"github.com/Eyepan/yap/src/ship"
 	"github.com/Eyepan/yap/src/types"
 	"github.com/Eyepan/yap/src/utils"
 )
@@ -28,6 +29,7 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 	stats := logger.Stats{}
 
 	lockFile := types.Lockfile{}
+	var lockMutex sync.Mutex
 	baseDependencies := *listOfPackages
 
 	numWorkers := 200 // arbitrarily huge number
@@ -38,6 +40,7 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 
 	metadataChannel := make(chan *types.Package)
 	downloadChannel := make(chan *types.MPackage)
+	// nmChannel := make(chan *types.MPackage)
 
 	var installedPackages sync.Map
 
@@ -53,7 +56,9 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 		go func() {
 			for mPkg := range downloadChannel {
 				DownloadPackageTarball(&downloadWg, mPkg, config, &stats)
+				lockMutex.Lock()
 				lockFile.Resolutions = append(lockFile.Resolutions, *mPkg)
+				lockMutex.Unlock()
 			}
 		}()
 	}
@@ -68,6 +73,7 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 			slog.Info(fmt.Sprintf("[INSTALL] There are %d packages in the lockfile to be installed", len(lockBin.Resolutions)))
 			stats.TotalDownloadCount = len(lockBin.Resolutions)
 			stats.TotalResolveCount = len(lockBin.Resolutions)
+			stats.TotalMoveCount = len(lockBin.Resolutions)
 			stats.ResolveCount = len(lockBin.Resolutions)
 			for i := range lockBin.Resolutions {
 				downloadWg.Add(1)
@@ -87,7 +93,9 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 		for name, version := range baseDependencies {
 			go func(name, version string) {
 				basePackage := types.Package{Name: name, Version: version}
+				lockMutex.Lock()
 				lockFile.CoreDependencies = append(lockFile.CoreDependencies, basePackage)
+				lockMutex.Unlock()
 				metadataChannel <- &basePackage
 				stats.IncrementTotalResolveCount()
 			}(name, version)
@@ -138,6 +146,7 @@ func ResolvePackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.P
 		Dependencies: dependencies,
 	}
 	stats.IncrementTotalDownloadCount()
+	stats.IncrementTotalMoveCount()
 
 	downloadWg.Add(1)
 	downloadChannel <- &packageToBeDownloaded
@@ -167,4 +176,7 @@ func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, co
 
 	stats.IncrementDownloadCount()
 	slog.Info(fmt.Sprintf("[TARBALL] ✅ %s@%s", mPkg.Name, mPkg.Version))
+
+	ship.InstallPackageToDotYap(mPkg, config, stats)
+	stats.IncrementMoveCount()
 }

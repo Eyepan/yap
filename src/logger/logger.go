@@ -10,11 +10,13 @@ type Stats struct {
 	TotalResolveCount  int
 	DownloadCount      int
 	TotalDownloadCount int
+	MoveCount          int
+	TotalMoveCount     int
 	statsMu            sync.Mutex
 }
 
 func (s *Stats) PrettyPrintStats() {
-	fmt.Printf("\r🔍[%d/%d] 🚚[%d/%d]\t", s.ResolveCount, s.TotalResolveCount, s.DownloadCount, s.TotalDownloadCount)
+	fmt.Printf("\r🔍[%d/%d] 🚚[%d/%d] ⛵[%d/%d]\t", s.ResolveCount, s.TotalResolveCount, s.DownloadCount, s.TotalDownloadCount, s.MoveCount, s.TotalMoveCount)
 }
 
 func (s *Stats) IncrementResolveCount() {
@@ -42,6 +44,20 @@ func (s *Stats) IncrementTotalDownloadCount() {
 	s.statsMu.Lock()
 	defer s.statsMu.Unlock()
 	s.TotalDownloadCount += 1
+	s.PrettyPrintStats()
+}
+
+func (s *Stats) IncrementMoveCount() {
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	s.MoveCount += 1
+	s.PrettyPrintStats()
+}
+
+func (s *Stats) IncrementTotalMoveCount() {
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	s.TotalMoveCount += 1
 	s.PrettyPrintStats()
 }
 
