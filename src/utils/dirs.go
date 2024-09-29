@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -50,28 +51,72 @@ func GetDotYapDir() (string, error) {
 
 // }
 
-func HardLinkTwoDirectories(sourceDir, destDir string) error {
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return fmt.Errorf("[SHIP] error creating destination directory: %w", err)
-	}
-
-	// Read files from the source directory
-	files, err := os.ReadDir(sourceDir)
-	if err != nil {
-		return fmt.Errorf("[SHIP] error reading source directory: %w", err)
-	}
-
-	for _, file := range files {
-		if !file.IsDir() {
-			sourcePath := filepath.Join(sourceDir, file.Name())
-			destPath := filepath.Join(destDir, file.Name())
-
-			// Create a hard link
-			if err := os.Link(sourcePath, destPath); err != nil {
-				return fmt.Errorf("[SHIP] error creating hard link for %s: %w", file.Name(), err)
-			}
-			slog.Info(fmt.Sprintf("[SHIP] Created hard link: %s -> %s\n", sourcePath, destPath))
+// hardlinkOrCopyRecursively tries to hardlink directories/files and falls back to copying if hardlinking fails.
+// If the error is that the file already exists, it skips the fallback to copying.
+func HardLinkOrCopyRecursively(sourceDir, targetDir string) error {
+	return filepath.Walk(sourceDir, func(srcPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
+
+		// Construct the target path by replacing the source prefix with target prefix
+		relPath, err := filepath.Rel(sourceDir, srcPath)
+		if err != nil {
+			return err
+		}
+		destPath := filepath.Join(targetDir, relPath)
+
+		// If it's a directory, create it in the target
+		if info.IsDir() {
+			if err := os.MkdirAll(destPath, info.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %v", destPath, err)
+			}
+			return nil
+		}
+
+		// Try to hardlink the file
+		if err := os.Link(srcPath, destPath); err != nil {
+			// If the error is that the file already exists, log a warning and skip copying
+			if os.IsExist(err) {
+				slog.Warn(fmt.Sprintf("file already exists, skipping: %s", destPath))
+				return nil
+			}
+
+			// Log a warning and fallback to copying the file
+			slog.Warn(fmt.Sprintf("hardlink failed for %s, falling back to copy: %v", srcPath, err))
+
+			// Fall back to copying the file if hardlink fails for another reason
+			if err := CopyFile(srcPath, destPath); err != nil {
+				return fmt.Errorf("failed to copy file %s to %s: %v", srcPath, destPath, err)
+			}
+		}
+
+		return nil
+	})
+}
+
+func CopyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
 	}
-	return nil
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Ensure the copied file has the same permissions as the source
+	sourceInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(dst, sourceInfo.Mode())
 }

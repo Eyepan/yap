@@ -12,41 +12,44 @@ import (
 )
 
 func InstallPackageToDotYap(mPkg *types.MPackage, config *types.YapConfig, stats *logger.Stats) {
+	// Check if package is already installed
 	if check, _ := CheckIfPackageIsAlreadyInstalled(mPkg); check {
 		slog.Info(fmt.Sprintf("[SHIP] Package %s@%s already installed", mPkg.Name, mPkg.Version))
 		return
 	}
 
+	// Initialize .yap directory
 	dotYapDir, err := utils.GetDotYapDir()
 	if err != nil {
 		slog.Error(fmt.Sprintf("failed to initialize the .yap directory inside node_modules:\t %v", err))
 		return
 	}
 
+	// Create package directory
 	packageDir := filepath.Join(dotYapDir, utils.SanitizePackageName(fmt.Sprintf("%s@%s", mPkg.Name, mPkg.Version)))
-
 	if err := os.MkdirAll(packageDir, 0755); err != nil {
 		slog.Error(fmt.Sprintf("failed to create package directory: %v", err))
 		return
 	}
 
-	// At this point, the package is definitely in the cache, hardlinking from the cache should be fine
-	// get the package from the cache
-
+	// Get store directory
 	storeDir, err := utils.GetStoreDir()
 	if err != nil {
 		slog.Error(fmt.Sprintf("failed to get store directory: %v", err))
 		return
 	}
-	// create dir for package
+
+	// Define source package directory
 	sourcePackageDir := filepath.Join(storeDir, utils.SanitizePackageName(fmt.Sprintf("%s@%s", mPkg.Name, mPkg.Version)))
 
-	if err := utils.HardLinkTwoDirectories(sourcePackageDir, packageDir); err != nil {
-		slog.Error(fmt.Sprintf("failed to hardlink files: %v", err))
+	// Try to hardlink files recursively, fallback to copying if it fails
+	err = utils.HardLinkOrCopyRecursively(sourcePackageDir, packageDir)
+	if err != nil {
+		slog.Error(fmt.Sprintf("failed to hardlink or copy files: %v", err))
+		return
 	}
 
 	slog.Info(fmt.Sprintf("[SHIP] ✅ %s@%s", mPkg.Name, mPkg.Version))
-	return
 }
 
 func CheckIfPackageIsAlreadyInstalled(mPkg *types.MPackage) (bool, error) {
