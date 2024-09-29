@@ -6,12 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Eyepan/yap/src/logger"
 	"github.com/Eyepan/yap/src/types"
 	"github.com/Eyepan/yap/src/utils"
 )
 
-func InstallPackageToDotYap(mPkg *types.MPackage, config *types.YapConfig, stats *logger.Stats) {
+func InstallPackageToDotYap(mPkg *types.MPackage, config *types.YapConfig) {
 	// Check if package is already installed
 	if check, _ := CheckIfPackageIsAlreadyInstalled(mPkg); check {
 		slog.Info(fmt.Sprintf("[SHIP] Package %s@%s already installed", mPkg.Name, mPkg.Version))

@@ -37,9 +37,11 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 
 	var metadataWg sync.WaitGroup
 	var downloadWg sync.WaitGroup
+	var installWg sync.WaitGroup
 
 	metadataChannel := make(chan *types.Package)
 	downloadChannel := make(chan *types.MPackage)
+	installChannel := make(chan *types.MPackage)
 
 	installedPackages := sync.Map{} // Track installed packages to avoid redundant work
 
@@ -56,10 +58,19 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for mPkg := range downloadChannel {
-				DownloadPackageTarball(&downloadWg, mPkg, config, &stats)
+				DownloadPackageTarball(&downloadWg, &installWg, installChannel, mPkg, config, &stats)
 				lockMutex.Lock()
 				lockFile.Resolutions = append(lockFile.Resolutions, *mPkg)
 				lockMutex.Unlock()
+			}
+		}()
+	}
+
+	// Worker for installing packages
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			for mPkg := range installChannel {
+				InstallPackageLocally(&installWg, mPkg, config, &stats)
 			}
 		}()
 	}
@@ -102,7 +113,7 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 				stats.IncrementTotalDownloadCount()
 				stats.IncrementTotalMoveCount()
 			} else {
-				metadataWg.Done() // If already installed, reduce the waitgroup counter
+				metadataWg.Done()
 			}
 		}
 	}
@@ -112,6 +123,9 @@ func InstallPackages(listOfPackages *types.Dependencies, force bool) {
 
 	downloadWg.Wait()
 	close(downloadChannel)
+
+	installWg.Wait()
+	close(installChannel)
 
 	// Write lockfile if necessary
 	if shouldCreateLockFile {
@@ -166,7 +180,7 @@ func ResolvePackageMetadata(metadataWg, downloadWg *sync.WaitGroup, pkg *types.P
 	}
 }
 
-func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, config *types.YapConfig, stats *logger.Stats) {
+func DownloadPackageTarball(downloadWg, installWg *sync.WaitGroup, installChannel chan<- *types.MPackage, mPkg *types.MPackage, config *types.YapConfig, stats *logger.Stats) {
 	defer downloadWg.Done()
 	defer stats.IncrementDownloadCount()
 	slog.Info(fmt.Sprintf("[TARBALL] 🚚 %s@%s", mPkg.Name, mPkg.Version))
@@ -177,7 +191,14 @@ func DownloadPackageTarball(downloadWg *sync.WaitGroup, mPkg *types.MPackage, co
 	}
 
 	slog.Info(fmt.Sprintf("[TARBALL] ✅ %s@%s", mPkg.Name, mPkg.Version))
+	installWg.Add(1)
+	installChannel <- mPkg
+}
 
-	ship.InstallPackageToDotYap(mPkg, config, stats)
-	stats.IncrementMoveCount()
+func InstallPackageLocally(installWg *sync.WaitGroup, mPkg *types.MPackage, config *types.YapConfig, stats *logger.Stats) {
+	defer installWg.Done()
+	defer stats.IncrementMoveCount()
+	ship.InstallPackageToDotYap(mPkg, config)
+
+	// handle dependencies? i think that should probably be done here
 }
